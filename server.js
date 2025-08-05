@@ -4,7 +4,7 @@
 require('dotenv').config(); // Carga las variables de entorno desde .env al inicio
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors = require('cors'); // Importa el módulo CORS
 
 // Importar rutas
 // ¡CORRECCIÓN AQUÍ! Asegúrate de que la 'U' de Users sea mayúscula para coincidir con el nombre del archivo
@@ -23,7 +23,12 @@ const engineRoutes = require('./systems/engine');
 const app = express();
 
 // 3. Configuración de middlewares
-app.use(cors()); // Habilita CORS para permitir peticiones desde el frontend
+// Configuración de CORS: Permite solicitudes solo desde tu frontend
+const corsOptions = {
+    origin: 'https://millennionbdd.com', // ¡AQUÍ SE ESPECIFICA LA URL DE TU FRONTEND!
+    optionsSuccessStatus: 200 // Para navegadores antiguos
+};
+app.use(cors(corsOptions)); // Habilita CORS con las opciones definidas
 app.use(express.json()); // Permite a Express parsear cuerpos de petición JSON
 
 // 4. Conexión a la base de datos MongoDB
