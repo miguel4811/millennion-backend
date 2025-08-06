@@ -10,6 +10,7 @@ const cors = require('cors'); // Importa el módulo CORS
 // ¡CORRECCIÓN AQUÍ! Asegúrate de que la 'U' de Users sea mayúscula para coincidir con el nombre del archivo
 const userRoutes = require('./routes/Users'); // Rutas para gestión de usuarios (login, register, profile)
 const subscriptionRoutes = require('./routes/subscriptionRoutes'); // Rutas de suscripción (PayPal)
+const adminRoutes = require('./routes/adminRoutes'); // ¡NUEVO! Rutas de administración (para cron jobs, etc.)
 
 // Importar todas las rutas de los sistemas
 const limenRoutes = require('./systems/limen');
@@ -50,6 +51,9 @@ app.use('/api/users', userRoutes);
 
 // Las rutas de suscripciones también manejan su propia protección internamente
 app.use('/api/subscriptions', subscriptionRoutes);
+
+// ¡NUEVO! Rutas de administración
+app.use('/api/admin', adminRoutes);
 
 // Rutas de los sistemas. Cada archivo de sistema ya usa 'protect' internamente
 // para sus rutas individuales cuando es necesario.

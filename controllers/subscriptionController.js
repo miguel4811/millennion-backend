@@ -7,8 +7,8 @@ const axios = require('axios'); // Para hacer peticiones HTTP a la API de PayPal
 const updatePlanLimits = (user, planName) => {
     switch (planName) {
         case 'Free':
-            user.creanovaMonthlyLimit = 5;
-            user.limenMonthlyLimit = 12;
+            user.creanovaMonthlyLimit = 10; // ¡ACTUALIZADO: 10 usos mensuales para Creanova!
+            user.limenMonthlyLimit = 15;   // ¡ACTUALIZADO: 15 usos mensuales para Limen!
             break;
         case 'Essential':
             user.creanovaMonthlyLimit = 50;
@@ -23,8 +23,8 @@ const updatePlanLimits = (user, planName) => {
             user.limenMonthlyLimit = -1;
             break;
         default:
-            user.creanovaMonthlyLimit = 5;
-            user.limenMonthlyLimit = 12;
+            user.creanovaMonthlyLimit = 10; // Valor por defecto para Free
+            user.limenMonthlyLimit = 15;   // Valor por defecto para Free
             planName = 'Free';
     }
     user.plan = planName;
@@ -58,6 +58,9 @@ const changeUserPlan = async (req, res) => {
 const generateAccessToken = async () => {
     const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString('base64');
     try {
+        // IMPORTANTE: Asegúrate de que PAYPAL_API_BASE esté configurado en Render
+        // Para Sandbox: https://api-m.sandbox.paypal.com
+        // Para Producción (LIVE): https://api-m.paypal.com
         const response = await axios.post(
             `${process.env.PAYPAL_API_BASE}/v1/oauth2/token`,
             'grant_type=client_credentials',
