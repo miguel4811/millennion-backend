@@ -1,43 +1,54 @@
+// millennion/backend/routes/creanovaRoutes.js
+
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware'); 
+const { checkUsage } = require('../middleware/usageMiddleware'); // Importa el nuevo middleware
 const User = require('../models/User'); 
-// Asumiendo que tienes un modelo para guardar las entradas de Creanova
-const CreanovaEntry = require('../models/CreanovaEntry'); // <-- ¡Asegúrate de que este modelo exista!
+const AnonymousUser = require('../models/AnonymousUser'); // Importa el modelo anónimo
+const CreanovaEntry = require('../models/CreanovaEntry'); 
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""; 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // --- Endpoint para Generar Ideas de Proyecto (AHORA SERÁ UN CHAT) ---
 // POST /api/creanova/generate-project-idea
-router.post('/generate-project-idea', protect, async (req, res) => {
-    const userId = req.userId;
-    const userName = req.userName;
+router.post('/generate-project-idea', checkUsage, async (req, res) => { // Usa checkUsage
     const { prompt: userPrompt, conversationHistory = [] } = req.body; 
+
+    // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
+    const user = req.user; // Puede ser null si es anónimo
+    const anonymousUser = req.anonymousUser; // Puede ser null si está autenticado
+    const isUserAuthenticated = req.isUserAuthenticated;
+
+    const currentUsage = req.creanovaUsage;
+    const monthlyLimit = req.creanovaLimit;
 
     if (!userPrompt) {
         return res.status(400).json({ message: 'El prompt del usuario no puede estar vacío.' });
     }
 
+    // === VERIFICACIÓN DE LÍMITES ===
+    if (monthlyLimit !== -1 && currentUsage >= monthlyLimit) {
+        return res.status(403).json({
+            message: isUserAuthenticated
+                ? `Has alcanzado tu límite mensual de Creanova (${monthlyLimit} usos). Por favor, actualiza tu plan.`
+                : `Has alcanzado tu límite de usos gratuitos de Creanova (${monthlyLimit} usos). Por favor, inicia sesión o regístrate para continuar.`
+        });
+    }
+
     try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: 'Usuario no encontrado.' });
-        }
+        console.log(`[CREANOVA Backend] Generando idea para ${user ? user.userName : 'Anónimo'} con prompt: "${userPrompt}"`);
 
-        if (user.creanovaMonthlyLimit !== -1 && user.creanovaCurrentMonthUsage >= user.creanovaMonthlyLimit) {
-            return res.status(403).json({ message: 'Has alcanzado tu límite mensual de Creanova. Por favor, actualiza tu plan.' });
-        }
-
-        console.log([CREANOVA Backend] Generando idea para ${userName || userId} con prompt: "${userPrompt}");
-
+        // Formatear el historial de conversación para la API de Gemini
         const formattedHistory = conversationHistory.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.text }]
         }));
 
+        // Añadir el prompt actual del usuario al historial para la llamada a la IA
         formattedHistory.push({ role: "user", parts: [{ text: userPrompt }] });
 
+        // Instrucción de sistema para la IA
         const systemInstruction = `Eres CREANOVA, la forja de realidades de Millennion BDD. Tu propósito es transformar los impulsos del usuario en proyectos disruptivos, simbólicos, estratégicos y asimétricos. Debes guiar al usuario a través de un proceso de creación que genere dependencia estructural y existencial de la innovación. Responde siempre con ideas que desafíen lo convencional, que busquen crear nuevas categorías de mercado o redefinir las existentes.
         
         Si el usuario solicita una "infraestructura", un "ecosistema" o un "MVP", enfócate en esos conceptos y proporciona un plan de acción inicial o una descripción detallada que refleje esa naturaleza.
@@ -49,7 +60,7 @@ router.post('/generate-project-idea', protect, async (req, res) => {
             systemInstruction: { parts: [{ text: systemInstruction }] }
         };
 
-        const llmResponse = await fetch(${GEMINI_API_URL}?key=${GEMINI_API_KEY}, {
+        const llmResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -57,8 +68,8 @@ router.post('/generate-project-idea', protect, async (req, res) => {
 
         if (!llmResponse.ok) {
             const errorData = await llmResponse.json();
-            console.error('Error de Gemini API al generar idea:', errorData);
-            throw new Error(errorData.error?.message || Error ${llmResponse.status} al llamar a Gemini API.);
+            console.error('Error de Gemini API al generar idea (respuesta completa):', JSON.stringify(errorData, null, 2));
+            throw new Error(errorData.error?.message || `Error ${llmResponse.status} al llamar a Gemini API.`);
         }
 
         const llmResult = await llmResponse.json();
@@ -70,26 +81,37 @@ router.post('/generate-project-idea', protect, async (req, res) => {
             generatedIdea = llmResult.candidates[0].content.parts[0].text;
         }
 
-        user.creanovaCurrentMonthUsage += 1;
-        await user.save();
+        // === INCREMENTO DE USO Y GUARDADO ===
+        if (user) {
+            user.creanovaCurrentMonthUsage += 1;
+            await user.save();
+        } else if (anonymousUser) {
+            anonymousUser.creanovaCurrentMonthUsage += 1;
+            await anonymousUser.save();
+        }
 
         // Guarda la entrada de Creanova en la base de datos
-        // Asegúrate de que el modelo CreanovaEntry tenga campos como userId, prompt, response, conversation
-        if (CreanovaEntry) { // Solo guarda si el modelo está definido
+        if (CreanovaEntry) { 
             const newEntry = new CreanovaEntry({
-                userId: userId,
-                type: 'project_idea', // Puedes definir tipos específicos
-                prompt: userPrompt,
-                response: generatedIdea,
-                conversation: formattedHistory, // Guarda el historial completo si lo necesitas
-                userName: userName // Guarda el nombre de usuario para referencia
+                userId: user ? user._id : null, // Guarda el ID de usuario si está autenticado
+                anonymousId: anonymousUser ? anonymousUser.anonymousId : null, // Guarda el ID anónimo si no está autenticado
+                type: 'project_idea', 
+                prompt: userPrompt, 
+                response: generatedIdea, 
+                conversation: formattedHistory, 
+                userName: user ? user.userName : 'Anónimo' 
             });
             await newEntry.save();
         } else {
             console.warn("CreanovaEntry model not found. Skipping saving idea to DB.");
         }
 
-        res.json({ idea: generatedIdea, usage: user.creanovaCurrentMonthUsage, limit: user.creanovaMonthlyLimit });
+        res.json({
+            idea: generatedIdea,
+            usage: user ? user.creanovaCurrentMonthUsage : anonymousUser.creanovaCurrentMonthUsage,
+            limit: user ? user.creanovaMonthlyLimit : monthlyLimit,
+            isUserAuthenticated: isUserAuthenticated // Informar al frontend si es autenticado
+        });
 
     } catch (llmError) {
         console.error('Error al generar la idea con IA:', llmError);
@@ -97,30 +119,29 @@ router.post('/generate-project-idea', protect, async (req, res) => {
     }
 });
 
-// --- NUEVO ENDPOINT: Obtener ideas de proyecto del usuario ---
+// --- Endpoint para Obtener ideas de proyecto del usuario (Solo para autenticados) ---
 // GET /api/creanova/user-ideas
-router.get('/user-ideas', protect, async (req, res) => {
+router.get('/user-ideas', checkUsage, async (req, res) => { // Usa checkUsage
+    // Esta ruta solo debería ser accesible para usuarios autenticados
+    if (!req.isUserAuthenticated) {
+        return res.status(403).json({ message: 'Debes iniciar sesión para ver tus ideas de Creanova.' });
+    }
+
     const userId = req.userId;
     const userName = req.userName;
 
-    if (!userId) {
-        return res.status(401).json({ message: 'Usuario no autenticado.' });
-    }
-
     try {
-        // Asumiendo que CreanovaEntry es el modelo donde guardas las ideas de Creanova
         if (!CreanovaEntry) {
             console.error("CreanovaEntry model not found. Cannot fetch user ideas.");
             return res.status(500).json({ message: 'Configuración del sistema Creanova incompleta.' });
         }
 
-        // Busca todas las entradas de Creanova para este usuario, ordenadas por fecha de creación
         const userIdeas = await CreanovaEntry.find({ userId: userId })
-                                            .sort({ createdAt: -1 }) // Las más recientes primero
-                                            .limit(20); // Limita a las últimas 20 ideas, por ejemplo
+                                            .sort({ createdAt: -1 }) 
+                                            .limit(20); 
 
         res.status(200).json({
-            message: Ideas de Creanova para ${userName || 'el explorador'}:,
+            message: `Ideas de Creanova para ${userName || 'el explorador'}:`,
             ideas: userIdeas
         });
 
@@ -129,6 +150,5 @@ router.get('/user-ideas', protect, async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor al obtener tus ideas de Creanova.', error: error.message });
     }
 });
-
 
 module.exports = router;
