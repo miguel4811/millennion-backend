@@ -1,15 +1,13 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User'); 
-const AnonymousUser = require('../models/AnonymousUser'); // Se necesita importar el modelo de usuario anónimo
+const AnonymousUser = require('../models/AnonymousUser');
 
 const checkUsage = async (req, res, next) => {
     let token;
     let user = null;
-    let anonymousUser = null;
     let isUserAuthenticated = false;
 
-    // --- Lógica para usuarios autenticados (Login) ---
-    // 1. Intentar obtener el token de autenticación del header
+    // 1. Prioridad máxima: Intentar autenticar con el token
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             token = req.headers.authorization.split(' ')[1];
@@ -21,13 +19,13 @@ const checkUsage = async (req, res, next) => {
                 }
             }
         } catch (error) {
-            // Si el token es inválido, el proceso continúa como usuario anónimo
+            // El token no es válido. No hacemos nada, el proceso sigue como anónimo
             console.error('Error al verificar el token:', error.message);
         }
     }
 
-    // 2. Si el usuario está autenticado, adjuntar su información y límites
     if (isUserAuthenticated && user) {
+        // Opción 1: El usuario está autenticado, adjuntamos su información
         req.user = user;
         req.isUserAuthenticated = true;
         req.creanovaUsage = user.creanovaCurrentMonthUsage;
@@ -37,16 +35,15 @@ const checkUsage = async (req, res, next) => {
         // req.limenLimit = user.limenMonthlyLimit;
         
     } else {
-        // --- Lógica para usuarios anónimos ---
-        // 3. Si no hay token o es inválido, buscar un ID anónimo en los headers
+        // Opción 2: El usuario es anónimo o el token no es válido
         const anonymousId = req.headers['x-anonymous-id'];
         req.isUserAuthenticated = false;
+        let anonymousUser = null;
 
         if (anonymousId) {
             anonymousUser = await AnonymousUser.findOne({ anonymousId });
             
             if (!anonymousUser) {
-                // Crear un nuevo usuario anónimo si no existe
                 anonymousUser = await AnonymousUser.create({
                     anonymousId,
                     creanovaCurrentMonthUsage: 0,
@@ -57,20 +54,14 @@ const checkUsage = async (req, res, next) => {
 
         req.anonymousUser = anonymousUser;
         
-        // 4. Adjuntar los límites y uso del usuario anónimo a la petición
-        // Esto evita el TypeError en las rutas
         if (anonymousUser) {
             req.creanovaUsage = anonymousUser.creanovaCurrentMonthUsage;
             req.creanovaLimit = anonymousUser.creanovaMonthlyLimit;
-            // Agrega aquí los límites para Limen si es necesario
-            // req.limenUsage = anonymousUser.limenCurrentMonthUsage;
-            // req.limenLimit = anonymousUser.limenMonthlyLimit;
         } else {
-            // Adjuntar valores por defecto si no se pudo encontrar/crear un anónimo
+            // Si no se encuentra ni se puede crear un usuario anónimo (ej. error de DB),
+            // usar valores por defecto para evitar el crasheo
             req.creanovaUsage = 0;
             req.creanovaLimit = process.env.CREANOVA_ANON_LIMIT || 3;
-            // req.limenUsage = 0;
-            // req.limenLimit = process.env.LIMEN_ANON_LIMIT || 5;
         }
     }
 
