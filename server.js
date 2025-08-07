@@ -25,9 +25,9 @@ const { checkUsage } = require('./middleware/usageMiddleware'); // ¡NUEVO! Midd
 const app = express();
 
 // 3. Configuración de middlewares
-// Configuración de CORS: Permite solicitudes solo desde tu frontend
+// Configuración de CORS: Permite solicitudes solo desde tus frontends
 const corsOptions = {
-    origin: 'https://millennionbdd.com', // ¡AQUÍ SE ESPECIFICA LA URL DE TU FRONTEND!
+    origin: ['https://millennionbdd.com', 'https://www.millennionbdd.com'], // ¡AQUÍ ESTÁ EL CAMBIO! Ahora acepta ambos dominios.
     optionsSuccessStatus: 200, // Para navegadores antiguos
     exposedHeaders: ['X-Set-Anonymous-ID'] // ¡IMPORTANTE! Exponer este encabezado para que el frontend pueda leerlo
 };
