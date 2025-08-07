@@ -1,14 +1,104 @@
-// millennion/backend/routes/limenRoutes.js
 const express = require('express');
 const router = express.Router();
-const { checkUsage } = require('../middleware/usageMiddleware'); // Importa el middleware de uso
-const User = require('../models/User'); // Importa el modelo de usuario
-const AnonymousUser = require('../models/AnonymousUser'); // Importa el modelo anónimo
-const LimenEntry = require('../models/LimenEntry'); // Importa el modelo para los registros de Límen
+const { checkUsage } = require('../middleware/usageMiddleware');
+const User = require('../models/User');
+const AnonymousUser = require('../models/AnonymousUser');
+const LimenEntry = require('../models/LimenEntry');
 
-// Asegúrate de que la clave API esté en tu .env del backend
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+
+/**
+ * @desc    Ruta para procesar un 'impulso' del frontend.
+ * @route   POST /api/limen/impulse
+ * @access  Public/Private (el middleware checkUsage gestiona los límites)
+ */
+router.post('/impulse', checkUsage, async (req, res) => {
+    const user = req.user;
+    const anonymousUser = req.anonymousUser;
+    const isUserAuthenticated = req.isUserAuthenticated;
+    
+    const currentUsage = req.limenUsage;
+    const monthlyLimit = req.limenLimit;
+
+    // === VERIFICACIÓN DE LÍMITES ===
+    if (monthlyLimit !== -1 && currentUsage >= monthlyLimit) {
+        return res.status(403).json({
+            message: isUserAuthenticated
+                ? `Has alcanzado tu límite de ${monthlyLimit} usos de Límen para este mes. Actualiza tu plan para recibir más guía y claridad.`
+                : `Has alcanzado tu límite de ${monthlyLimit} usos gratuitos de Límen. Por favor, inicia sesión o regístrate para continuar.`
+        });
+    }
+
+    const { prompt } = req.body;
+    if (!prompt) {
+        return res.status(400).json({ message: 'El impulso (prompt) no puede estar vacío.' });
+    }
+
+    console.log(`[LÍMEN Backend] Recibiendo impulso de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
+
+    const llmPrompt = `El usuario "${user ? user.userName : 'explorador'}" ha emitido el siguiente impulso liminal: "${prompt}". Responde con una "resonancia simbólica" que active la introspección. Tu respuesta debe ser una metáfora, un haiku, una pregunta existencial o una frase enigmática que conecte con la esencia del impulso, no una respuesta lógica. Evita dar consejos directos. El tono debe ser místico y evocador. La respuesta debe ser concisa.`;
+
+    try {
+        const payload = { contents: [{ role: "user", parts: [{ text: llmPrompt }] }] };
+
+        const llmResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!llmResponse.ok) {
+            const errorData = await llmResponse.json();
+            console.error('Error de Gemini API al generar resonancia:', errorData);
+            throw new Error(errorData.error?.message || `Error ${llmResponse.status} al llamar a Gemini API.`);
+        }
+
+        const llmResult = await llmResponse.json();
+        let generatedResonance = "El eco de tu alma ya tiene la respuesta. Escucha en el silencio de tu ser."; // Frase de respaldo
+
+        if (llmResult.candidates && llmResult.candidates.length > 0 &&
+            llmResult.candidates[0].content && llmResult.candidates[0].content.parts &&
+            llmResult.candidates[0].content.parts.length > 0) {
+            generatedResonance = llmResult.candidates[0].content.parts[0].text;
+        }
+
+        // === INCREMENTO DE USO Y GUARDADO ===
+        if (user) {
+            user.limenCurrentMonthUsage += 1;
+            await user.save();
+        } else if (anonymousUser) {
+            anonymousUser.limenCurrentMonthUsage += 1;
+            await anonymousUser.save();
+        }
+
+        // Guarda el impulso y su respuesta en la base de datos
+        const newEntry = new LimenEntry({
+            userId: user ? user._id : null,
+            anonymousId: anonymousUser ? anonymousUser.anonymousId : null,
+            type: 'impulse_resonance',
+            query: prompt,
+            response: generatedResonance,
+            metadata: {
+                userName: user ? user.userName : 'Anónimo'
+            }
+        });
+        await newEntry.save();
+
+        setTimeout(() => {
+            res.json({
+                message: generatedResonance,
+                usage: user ? user.limenCurrentMonthUsage : anonymousUser.limenCurrentMonthUsage,
+                limit: user ? user.limenMonthlyLimit : monthlyLimit,
+                isUserAuthenticated: isUserAuthenticated
+            });
+        }, 1000);
+
+    } catch (llmError) {
+        console.error('Error al generar la resonancia con IA:', llmError);
+        res.status(500).json({ message: 'Límen está resonando en el éter. Intenta de nuevo más tarde.', error: llmError.message });
+    }
+});
 
 /**
  * @desc    Genera una revelación/guía con IA.
