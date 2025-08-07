@@ -1,42 +1,80 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Asegúrate de que la ruta a tu modelo User sea correcta
+const User = require('../models/User'); 
+const AnonymousUser = require('../models/AnonymousUser'); // Se necesita importar el modelo de usuario anónimo
 
 const checkUsage = async (req, res, next) => {
     let token;
+    let user = null;
+    let anonymousUser = null;
+    let isUserAuthenticated = false;
 
-    // 1. Verificar si el token existe en los headers
+    // --- Lógica para usuarios autenticados (Login) ---
+    // 1. Intentar obtener el token de autenticación del header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // Obtener el token del header
             token = req.headers.authorization.split(' ')[1];
-            
-            // Si el token es nulo o 'null' como string, no intentar verificarlo
-            if (!token || token === 'null') {
-                req.isAnonymous = true;
-                return next();
+            if (token && token !== 'null') {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                user = await User.findById(decoded.id).select('-password');
+                if (user) {
+                    isUserAuthenticated = true;
+                }
             }
-
-            // 2. Verificar el token y obtener el ID del usuario
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-            // 3. Obtener el usuario del token y adjuntarlo a la solicitud
-            // Esto asume que tu modelo User tiene un método para buscar por ID
-            req.user = await User.findById(decoded.id).select('-password');
-            req.isAnonymous = false;
-            next();
-
         } catch (error) {
-            // Si el token es inválido o malformado, tratar como anónimo
-            // Para evitar que el servidor crashee con el error "jwt malformed"
-            console.error('Error de autenticación, tratando como usuario anónimo:', error.message);
-            req.isAnonymous = true;
-            next();
+            // Si el token es inválido, el proceso continúa como usuario anónimo
+            console.error('Error al verificar el token:', error.message);
         }
-    } else {
-        // Si no hay token en el header, también es un usuario anónimo
-        req.isAnonymous = true;
-        next();
     }
+
+    // 2. Si el usuario está autenticado, adjuntar su información y límites
+    if (isUserAuthenticated && user) {
+        req.user = user;
+        req.isUserAuthenticated = true;
+        req.creanovaUsage = user.creanovaCurrentMonthUsage;
+        req.creanovaLimit = user.creanovaMonthlyLimit;
+        // Agrega aquí los límites para Limen si es necesario
+        // req.limenUsage = user.limenCurrentMonthUsage;
+        // req.limenLimit = user.limenMonthlyLimit;
+        
+    } else {
+        // --- Lógica para usuarios anónimos ---
+        // 3. Si no hay token o es inválido, buscar un ID anónimo en los headers
+        const anonymousId = req.headers['x-anonymous-id'];
+        req.isUserAuthenticated = false;
+
+        if (anonymousId) {
+            anonymousUser = await AnonymousUser.findOne({ anonymousId });
+            
+            if (!anonymousUser) {
+                // Crear un nuevo usuario anónimo si no existe
+                anonymousUser = await AnonymousUser.create({
+                    anonymousId,
+                    creanovaCurrentMonthUsage: 0,
+                    creanovaMonthlyLimit: process.env.CREANOVA_ANON_LIMIT || 3,
+                });
+            }
+        }
+
+        req.anonymousUser = anonymousUser;
+        
+        // 4. Adjuntar los límites y uso del usuario anónimo a la petición
+        // Esto evita el TypeError en las rutas
+        if (anonymousUser) {
+            req.creanovaUsage = anonymousUser.creanovaCurrentMonthUsage;
+            req.creanovaLimit = anonymousUser.creanovaMonthlyLimit;
+            // Agrega aquí los límites para Limen si es necesario
+            // req.limenUsage = anonymousUser.limenCurrentMonthUsage;
+            // req.limenLimit = anonymousUser.limenMonthlyLimit;
+        } else {
+            // Adjuntar valores por defecto si no se pudo encontrar/crear un anónimo
+            req.creanovaUsage = 0;
+            req.creanovaLimit = process.env.CREANOVA_ANON_LIMIT || 3;
+            // req.limenUsage = 0;
+            // req.limenLimit = process.env.LIMEN_ANON_LIMIT || 5;
+        }
+    }
+
+    next();
 };
 
 module.exports = { checkUsage };
