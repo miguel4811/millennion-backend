@@ -1,25 +1,26 @@
 // millennion/backend/routes/limenRoutes.js
-
 const express = require('express');
 const router = express.Router();
-const { checkUsage } = require('../middleware/usageMiddleware'); // Importa el nuevo middleware
+const { checkUsage } = require('../middleware/usageMiddleware'); // Importa el middleware de uso
 const User = require('../models/User'); // Importa el modelo de usuario
 const AnonymousUser = require('../models/AnonymousUser'); // Importa el modelo anónimo
-const LimenEntry = require('../models/LimenEntry'); // ¡Importa tu nuevo modelo LimenEntry!
+const LimenEntry = require('../models/LimenEntry'); // Importa el modelo para los registros de Límen
 
-// Asegúrate de que GEMINI_API_KEY esté en tu .env del backend
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""; 
+// Asegúrate de que la clave API esté en tu .env del backend
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-// @desc    Obtener una revelación/guía con IA
-// @route   POST /api/limen/get-revelation  
-// @access  Public/Private (manejo de límites en checkUsage)
-router.post('/get-revelation', checkUsage, async (req, res) => { // Usa checkUsage
-    // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
-    const user = req.user; // Puede ser null si es anónimo
-    const anonymousUser = req.anonymousUser; // Puede ser null si está autenticado
+/**
+ * @desc    Genera una revelación/guía con IA.
+ * @route   POST /api/limen/get-revelation
+ * @access  Public/Private (el middleware checkUsage gestiona los límites)
+ */
+router.post('/get-revelation', checkUsage, async (req, res) => {
+    // Los datos del usuario y los límites se obtienen del middleware checkUsage
+    const user = req.user; // Objeto de usuario si está autenticado
+    const anonymousUser = req.anonymousUser; // Objeto de usuario anónimo si no está autenticado
     const isUserAuthenticated = req.isUserAuthenticated;
-
+    
     const currentUsage = req.limenUsage;
     const monthlyLimit = req.limenLimit;
 
@@ -52,7 +53,7 @@ router.post('/get-revelation', checkUsage, async (req, res) => { // Usa checkUsa
         }
 
         const llmResult = await llmResponse.json();
-        let generatedPhrase = "El eco de tu alma ya tiene la respuesta. Escucha en el silencio de tu ser."; // Frase fallback
+        let generatedPhrase = "El eco de tu alma ya tiene la respuesta. Escucha en el silencio de tu ser."; // Frase de respaldo
 
         if (llmResult.candidates && llmResult.candidates.length > 0 &&
             llmResult.candidates[0].content && llmResult.candidates[0].content.parts &&
@@ -71,8 +72,8 @@ router.post('/get-revelation', checkUsage, async (req, res) => { // Usa checkUsa
 
         // Guarda la revelación en la base de datos
         const newEntry = new LimenEntry({
-            userId: user ? user._id : null, // Guarda el ID de usuario si está autenticado
-            anonymousId: anonymousUser ? anonymousUser.anonymousId : null, // Guarda el ID anónimo si no está autenticado
+            userId: user ? user._id : null,
+            anonymousId: anonymousUser ? anonymousUser.anonymousId : null,
             type: 'revelation',
             response: generatedPhrase,
             metadata: {
@@ -82,9 +83,9 @@ router.post('/get-revelation', checkUsage, async (req, res) => { // Usa checkUsa
         });
         await newEntry.save();
 
-        setTimeout(() => { // Mantiene el setTimeout para simular tiempo de "meditación"
+        setTimeout(() => { // Simula un tiempo de "meditación" antes de responder
             res.json({
-                revelation: generatedPhrase, // Cambiado de 'phrase' a 'revelation' para consistencia
+                revelation: generatedPhrase,
                 usage: user ? user.limenCurrentMonthUsage : anonymousUser.limenCurrentMonthUsage,
                 limit: user ? user.limenMonthlyLimit : monthlyLimit,
                 isUserAuthenticated: isUserAuthenticated
@@ -97,16 +98,18 @@ router.post('/get-revelation', checkUsage, async (req, res) => { // Usa checkUsa
     }
 });
 
-// --- Endpoint para Recibir Dudas/Preguntas ---
-// POST /api/limen/doubt
-router.post('/doubt', checkUsage, async (req, res) => { // Usa checkUsage
+/**
+ * @desc    Recibe una duda o pregunta y responde con una "respuesta simbólica".
+ * @route   POST /api/limen/doubt
+ * @access  Public/Private (el middleware checkUsage gestiona los límites)
+ */
+router.post('/doubt', checkUsage, async (req, res) => {
     const { question } = req.body;
 
-    // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
-    const user = req.user; // Puede ser null si es anónimo
-    const anonymousUser = req.anonymousUser; // Puede ser null si está autenticado
+    const user = req.user;
+    const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
-
+    
     const currentUsage = req.limenUsage;
     const monthlyLimit = req.limenLimit;
 
@@ -142,7 +145,7 @@ router.post('/doubt', checkUsage, async (req, res) => { // Usa checkUsage
         }
 
         const llmResult = await llmResponse.json();
-        let symbolicAnswer = "El eco de tu alma ya tiene la respuesta. Escucha en el silencio de tu ser."; // Frase fallback
+        let symbolicAnswer = "El eco de tu alma ya tiene la respuesta. Escucha en el silencio de tu ser.";
 
         if (llmResult.candidates && llmResult.candidates.length > 0 &&
             llmResult.candidates[0].content && llmResult.candidates[0].content.parts &&
@@ -161,13 +164,13 @@ router.post('/doubt', checkUsage, async (req, res) => { // Usa checkUsage
 
         // Guarda la duda y su respuesta en la base de datos
         const newEntry = new LimenEntry({
-            userId: user ? user._id : null, // Guarda el ID de usuario si está autenticado
-            anonymousId: anonymousUser ? anonymousUser.anonymousId : null, // Guarda el ID anónimo si no está autenticado
+            userId: user ? user._id : null,
+            anonymousId: anonymousUser ? anonymousUser.anonymousId : null,
             type: 'doubt_response',
-            query: question, // Guardamos la pregunta del usuario
+            query: question,
             response: symbolicAnswer,
             metadata: {
-                prompt: prompt, // Guarda el prompt usado
+                prompt: prompt,
                 userName: user ? user.userName : 'Anónimo'
             }
         });
@@ -188,14 +191,16 @@ router.post('/doubt', checkUsage, async (req, res) => { // Usa checkUsage
     }
 });
 
-// --- Endpoint para Rituales (Ejemplo) ---
-// POST /api/limen/ritual
-router.post('/ritual', checkUsage, async (req, res) => { // Usa checkUsage
+/**
+ * @desc    Activa un ritual y registra el evento.
+ * @route   POST /api/limen/ritual
+ * @access  Public/Private (el middleware checkUsage gestiona los límites)
+ */
+router.post('/ritual', checkUsage, async (req, res) => {
     const { ritualType, data } = req.body;
 
-    // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
-    const user = req.user; // Puede ser null si es anónimo
-    const anonymousUser = req.anonymousUser; // Puede ser null si está autenticado
+    const user = req.user;
+    const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
 
     const currentUsage = req.limenUsage;
@@ -212,21 +217,21 @@ router.post('/ritual', checkUsage, async (req, res) => { // Usa checkUsage
 
     console.log(`[LÍMEN Backend] Usuario ${user ? user.userName : 'Anónimo'} activando ritual: ${ritualType} con datos:`, data);
 
-    // Incremento de uso y guardado (para rituales también)
-    if (user) {
-        user.limenCurrentMonthUsage += 1;
-        await user.save();
-    } else if (anonymousUser) {
-        anonymousUser.limenCurrentMonthUsage += 1;
-        await anonymousUser.save();
-    }
-
     try {
         if (ritualType === 'initiation_ritual') {
+            // Incremento de uso y guardado (para rituales también)
+            if (user) {
+                user.limenCurrentMonthUsage += 1;
+                await user.save();
+            } else if (anonymousUser) {
+                anonymousUser.limenCurrentMonthUsage += 1;
+                await anonymousUser.save();
+            }
+            
             const newEntry = new LimenEntry({
                 userId: user ? user._id : null,
                 anonymousId: anonymousUser ? anonymousUser.anonymousId : null,
-                type: 'ritual_activation', 
+                type: 'ritual_activation',
                 query: `Activación de ritual: ${ritualType}`,
                 response: `Ritual de iniciación completado por ${user ? user.userName : 'el explorador anónimo'}.`,
                 metadata: {
@@ -246,6 +251,7 @@ router.post('/ritual', checkUsage, async (req, res) => { // Usa checkUsage
                 });
             }, 500);
         } else {
+            // No se incrementa el uso si el ritual no es reconocido
             setTimeout(() => {
                 res.status(400).json({ status: 'error', message: `Ritual '${ritualType}' desconocido o no permitido para ${user ? user.userName : 'el explorador anónimo'}.` });
             }, 500);
@@ -256,9 +262,12 @@ router.post('/ritual', checkUsage, async (req, res) => { // Usa checkUsage
     }
 });
 
-// --- Opcional: Endpoint para obtener el historial de Limen (Solo para autenticados) ---
-router.get('/history', checkUsage, async (req, res) => { // Usa checkUsage
-    // Esta ruta solo debería ser accesible para usuarios autenticados
+/**
+ * @desc    Obtiene el historial de Limen para el usuario autenticado.
+ * @route   GET /api/limen/history
+ * @access  Private
+ */
+router.get('/history', checkUsage, async (req, res) => {
     if (!req.isUserAuthenticated) {
         return res.status(403).json({ message: 'Debes iniciar sesión para ver tu historial con Límen.' });
     }
