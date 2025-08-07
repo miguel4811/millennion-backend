@@ -3,36 +3,40 @@ const mongoose = require('mongoose');
 const CreanovaEntrySchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', // Referencia al modelo User
-        required: true
+        ref: 'User'
+        // Ya no es 'required'
     },
-    userName: { // Para facilitar la consulta por nombre de usuario
+    anonymousId: {
+        type: String
+        // Nuevo campo para usuarios anónimos
+    },
+    userName: {
         type: String,
         required: true
     },
-    type: { // Por ejemplo: 'project_idea', 'ecosystem_plan', 'mvp_blueprint'
+    type: {
         type: String,
         required: true,
         default: 'project_idea'
     },
-    prompt: { // El prompt original del usuario
+    prompt: {
         type: String,
         required: true
     },
-    response: { // La respuesta generada por la IA
+    response: {
         type: String,
         required: true
     },
-    conversation: { // Opcional: para guardar el historial completo del chat
+    conversation: {
         type: Array,
         default: []
     },
-    metadata: { // Para cualquier dato adicional que quieras guardar
+    metadata: {
         type: Object,
         default: {}
     }
 }, {
-    timestamps: true // Añade createdAt y updatedAt automáticamente
+    timestamps: true
 });
 
 module.exports = mongoose.model('CreanovaEntry', CreanovaEntrySchema);
