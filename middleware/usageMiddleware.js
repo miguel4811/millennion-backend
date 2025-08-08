@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); 
+const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 
+/**
+ * @description Middleware para verificar la autenticación del usuario y
+ *                 gestionar los límites de uso de los módulos.
+ *                 El usuario puede ser autenticado o anónimo.
+ */
 const checkUsage = async (req, res, next) => {
     let token;
     let user = null;
@@ -28,11 +33,14 @@ const checkUsage = async (req, res, next) => {
         // Opción 1: El usuario está autenticado, adjuntamos su información
         req.user = user;
         req.isUserAuthenticated = true;
+        
+        // Asignar los límites del usuario autenticado
         req.creanovaUsage = user.creanovaCurrentMonthUsage;
         req.creanovaLimit = user.creanovaMonthlyLimit;
-        // Agrega aquí los límites para Limen si es necesario
-        // req.limenUsage = user.limenCurrentMonthUsage;
-        // req.limenLimit = user.limenMonthlyLimit;
+        req.limenUsage = user.limenCurrentMonthUsage;
+        
+        // Límite de 15 usos para usuarios autenticados con plan gratuito
+        req.limenLimit = user.limenMonthlyLimit || 15; 
         
     } else {
         // Opción 2: El usuario es anónimo o el token no es válido
@@ -44,10 +52,15 @@ const checkUsage = async (req, res, next) => {
             anonymousUser = await AnonymousUser.findOne({ anonymousId });
             
             if (!anonymousUser) {
+                // Si no existe, lo creamos con el límite de 5 para Limen
                 anonymousUser = await AnonymousUser.create({
                     anonymousId,
                     creanovaCurrentMonthUsage: 0,
                     creanovaMonthlyLimit: process.env.CREANOVA_ANON_LIMIT || 3,
+                    
+                    // Límite de 5 usos para usuarios anónimos
+                    limenCurrentMonthUsage: 0,
+                    limenMonthlyLimit: process.env.LIMEN_ANON_LIMIT || 5, 
                 });
             }
         }
@@ -57,11 +70,15 @@ const checkUsage = async (req, res, next) => {
         if (anonymousUser) {
             req.creanovaUsage = anonymousUser.creanovaCurrentMonthUsage;
             req.creanovaLimit = anonymousUser.creanovaMonthlyLimit;
+            // Usar el límite de la base de datos si existe, si no, el por defecto
+            req.limenUsage = anonymousUser.limenCurrentMonthUsage;
+            req.limenLimit = anonymousUser.limenMonthlyLimit || 5; 
         } else {
-            // Si no se encuentra ni se puede crear un usuario anónimo (ej. error de DB),
-            // usar valores por defecto para evitar el crasheo
+            // Si no se encuentra ni se puede crear un usuario anónimo, usar valores por defecto
             req.creanovaUsage = 0;
             req.creanovaLimit = process.env.CREANOVA_ANON_LIMIT || 3;
+            req.limenUsage = 0;
+            req.limenLimit = process.env.LIMEN_ANON_LIMIT || 5;
         }
     }
 
