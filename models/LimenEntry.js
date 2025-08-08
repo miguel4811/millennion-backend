@@ -2,25 +2,34 @@ const mongoose = require('mongoose');
 
 const limenEntrySchema = new mongoose.Schema({
     userId: {
-        type: String, // Coincide con el userId de tu Idea.js y authMiddleware
-        required: true,
+        type: String,
+        required: false, // Ahora es opcional
+        index: true
+    },
+    anonymousId: {
+        type: String,
+        required: false, // Campo para usuarios anónimos
         index: true
     },
     type: {
-        type: String, // 'revelation' o 'doubt_response'
-        enum: ['revelation', 'doubt_response'], // Restringe los valores posibles
+        type: String,
+        // Enum expandido para incluir los nuevos tipos de interacción
+        enum: ['revelation', 'doubt_response', 'impulse_resonance', 'ritual_activation'],
         required: true
     },
     query: {
-        type: String, // La pregunta del usuario si el type es 'doubt_response'
-        required: function() { return this.type === 'doubt_response'; } // Requerido solo si es una respuesta a duda
+        type: String,
+        // El campo `query` ahora es requerido para `doubt_response` e `impulse_resonance`
+        required: function() { 
+            return this.type === 'doubt_response' || this.type === 'impulse_resonance';
+        }
     },
     response: {
-        type: String, // La revelación o la respuesta simbólica de la IA
+        type: String,
         required: true
     },
     metadata: {
-        type: mongoose.Schema.Types.Mixed, // Para guardar cualquier información adicional relevante de la IA o el proceso
+        type: mongoose.Schema.Types.Mixed,
         default: {}
     },
     createdAt: {
@@ -36,6 +45,11 @@ const limenEntrySchema = new mongoose.Schema({
 // Middleware para actualizar la fecha de modificación antes de guardar
 limenEntrySchema.pre('save', function(next) {
     this.updatedAt = Date.now();
+    
+    // Custom validator para asegurar que haya un userId o un anonymousId
+    if (!this.userId && !this.anonymousId) {
+        return next(new Error('Una entrada de Límen debe tener un userId o un anonymousId.'));
+    }
     next();
 });
 
