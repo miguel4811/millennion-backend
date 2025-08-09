@@ -9,7 +9,7 @@ const { updatePlanLimits } = require('./subscriptionController');
 // @route   POST /api/users/register
 // @access  Public
 const registerUser = async (req, res) => {
-    const { userName, email, password } = req.body; // userName viene del frontend
+    const { userName, email, password } = req.body;
 
     if (!userName || !email || !password) {
         return res.status(400).json({ message: 'Por favor, introduce todos los campos: nombre de usuario, email y contraseña.' });
@@ -25,14 +25,14 @@ const registerUser = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         user = new User({
-            userName, // Aquí se asigna el userName del request al campo userName del modelo
+            userName,
             email,
             password: hashedPassword,
         });
 
         // --- CAMBIO IMPORTANTE AQUÍ ---
-        // Configurar los límites del plan "Gratuito" directamente para evitar el error.
-        user.plan = 'Gratuito';
+        // Configurar los límites del plan "Free" para evitar el error.
+        user.plan = 'Free'; // CAMBIO AQUÍ
         user.creanovaMonthlyLimit = 10;
         user.limenMonthlyLimit = 15;
         
@@ -45,7 +45,7 @@ const registerUser = async (req, res) => {
         await user.save();
 
         const token = jwt.sign(
-            { id: user._id, email: user.email, userName: user.userName }, // Correcto: user.userName
+            { id: user._id, email: user.email, userName: user.userName },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
@@ -54,7 +54,7 @@ const registerUser = async (req, res) => {
             message: 'Registro exitoso',
             user: {
                 id: user._id,
-                userName: user.userName, // Correcto: user.userName
+                userName: user.userName,
                 email: user.email,
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
@@ -69,6 +69,11 @@ const registerUser = async (req, res) => {
 
     } catch (error) {
         console.error('Error en el registro de usuario:', error);
+        // Si ocurre un error de validación, lo enviamos con más detalle
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ message: messages.join(', ') });
+        }
         res.status(500).json({ message: 'Error interno del servidor al registrar usuario.' });
     }
 };
@@ -95,7 +100,7 @@ const loginUser = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user._id, email: user.email, userName: user.userName }, // ¡CORRECCIÓN AQUÍ!
+            { id: user._id, email: user.email, userName: user.userName },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
@@ -104,7 +109,7 @@ const loginUser = async (req, res) => {
             message: 'Inicio de sesión exitoso',
             user: {
                 id: user._id,
-                userName: user.userName, // ¡CORRECCIÓN AQUÍ!
+                userName: user.userName,
                 email: user.email,
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
