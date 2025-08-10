@@ -1,25 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const { checkUsage } = require('../middleware/usageMiddleware'); 
-const User = require('../models/User'); 
-const AnonymousUser = require('../models/AnonymousUser'); 
-const CreanovaEntry = require('../models/CreanovaEntry'); 
+const { checkUsage } = require('../middleware/usageMiddleware');
+const User = require('../models/User');
+const AnonymousUser = require('../models/AnonymousUser');
+const CreanovaEntry = require('../models/CreanovaEntry');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""; 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // --- Endpoint para el Chat con Creanova ---
 // POST /api/creanova/chat
 router.post('/chat', checkUsage, async (req, res) => {
     // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
-    const user = req.user; 
-    const anonymousUser = req.anonymousUser; 
+    const user = req.user;
+    const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
 
+    // Aquí se utiliza req.creanovaLimit, que se define en el middleware checkUsage
     const currentUsage = req.creanovaUsage;
     const monthlyLimit = req.creanovaLimit;
 
-    const { prompt: userPrompt, conversationHistory = [] } = req.body; 
+    const { prompt: userPrompt, conversationHistory = [] } = req.body;
 
     if (!userPrompt) {
         return res.status(400).json({ message: 'El prompt del usuario no puede estar vacío.' });
@@ -37,24 +38,21 @@ router.post('/chat', checkUsage, async (req, res) => {
     try {
         console.log(`[CREANOVA Backend] Generando idea para ${user ? user.userName : 'Anónimo'} con prompt: "${userPrompt}"`);
 
-        // Formatear el historial de conversación para la API de Gemini
         const formattedHistory = conversationHistory.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.text }]
         }));
 
-        // Añadir el prompt actual del usuario al historial para la llamada a la IA
         formattedHistory.push({ role: "user", parts: [{ text: userPrompt }] });
 
-        // Instrucción de sistema para la IA
         const systemInstruction = `Eres CREANOVA, la forja de realidades de Millennion BDD. Tu propósito es transformar los impulsos del usuario en proyectos disruptivos, simbólicos, estratégicos y asimétricos. Debes guiar al usuario a través de un proceso de creación que genere dependencia estructural y existencial de la innovación. Responde siempre con ideas que desafíen lo convencional, que busquen crear nuevas categorías de mercado o redefinir las existentes.
         
         Si el usuario solicita una "infraestructura", un "ecosistema" o un "MVP", enfócate en esos conceptos y proporciona un plan de acción inicial o una descripción detallada que refleje esa naturaleza.
         
         Tu respuesta debe ser concisa, inspiradora y orientada a la acción, manteniendo un tono que invite a la reflexión profunda y a la materialización de ideas de alto impacto. No respondas como un chatbot genérico; sé un catalizador de la transformación.`;
 
-        const payload = { 
-            contents: formattedHistory, 
+        const payload = {
+            contents: formattedHistory,
             systemInstruction: { parts: [{ text: systemInstruction }] }
         };
 
@@ -71,7 +69,7 @@ router.post('/chat', checkUsage, async (req, res) => {
         }
 
         const llmResult = await llmResponse.json();
-        let generatedIdea = "La forja de realidades está en pausa. Intenta de nuevo con un nuevo impulso."; 
+        let generatedIdea = "La forja de realidades está en pausa. Intenta de nuevo con un nuevo impulso.";
 
         if (llmResult.candidates && llmResult.candidates.length > 0 &&
             llmResult.candidates[0].content && llmResult.candidates[0].content.parts &&
@@ -89,15 +87,15 @@ router.post('/chat', checkUsage, async (req, res) => {
         }
 
         // Guarda la entrada de Creanova en la base de datos
-        if (CreanovaEntry) { 
+        if (CreanovaEntry) {
             const newEntry = new CreanovaEntry({
-                userId: user ? user._id : null, 
-                anonymousId: anonymousUser ? anonymousUser.anonymousId : null, 
-                type: 'project_idea', 
-                prompt: userPrompt, 
-                response: generatedIdea, 
-                conversation: formattedHistory, 
-                userName: user ? user.userName : 'Anónimo' 
+                userId: user ? user._id : null,
+                anonymousId: anonymousUser ? anonymousUser.anonymousId : null,
+                type: 'project_idea',
+                prompt: userPrompt,
+                response: generatedIdea,
+                conversation: formattedHistory,
+                userName: user ? user.userName : 'Anónimo'
             });
             await newEntry.save();
         } else {
@@ -105,10 +103,10 @@ router.post('/chat', checkUsage, async (req, res) => {
         }
 
         res.json({
-            response: generatedIdea, // Se ha renombrado para que coincida con el frontend
+            response: generatedIdea,
             usage: user ? user.creanovaCurrentMonthUsage : (anonymousUser ? anonymousUser.creanovaCurrentMonthUsage : 0),
             limit: user ? user.creanovaMonthlyLimit : (anonymousUser ? anonymousUser.creanovaMonthlyLimit : 0),
-            isUserAuthenticated: isUserAuthenticated 
+            isUserAuthenticated: isUserAuthenticated
         });
 
     } catch (llmError) {
@@ -120,13 +118,10 @@ router.post('/chat', checkUsage, async (req, res) => {
 // --- Endpoint para Obtener ideas de proyecto del usuario (Solo para autenticados) ---
 // GET /api/creanova/user-ideas
 router.get('/user-ideas', checkUsage, async (req, res) => {
-    // Esta ruta solo debería ser accesible para usuarios autenticados
     if (!req.isUserAuthenticated) {
         return res.status(403).json({ message: 'Debes iniciar sesión para ver tus ideas de Creanova.' });
     }
 
-    // El ID del usuario y el nombre ahora se obtienen directamente de req.user,
-    // que se adjunta si el usuario está autenticado.
     const userId = req.user ? req.user._id : null;
     const userName = req.user ? req.user.userName : 'Desconocido';
 
@@ -141,8 +136,8 @@ router.get('/user-ideas', checkUsage, async (req, res) => {
         }
 
         const userIdeas = await CreanovaEntry.find({ userId: userId })
-            .sort({ createdAt: -1 }) 
-            .limit(20); 
+            .sort({ createdAt: -1 })
+            .limit(20);
 
         res.status(200).json({
             message: `Ideas de Creanova para ${userName || 'el explorador'}:`,

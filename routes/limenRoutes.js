@@ -6,44 +6,29 @@ const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 const LimenEntry = require('../models/LimenEntry');
 
-// Gemini API configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
-/**
- * Función auxiliar para asegurar que siempre haya un usuario anónimo
- * si la solicitud no está autenticada y no tiene un ID anónimo.
- */
 const ensureAnonymousUser = async (req, res) => {
-    // Si el usuario ya está autenticado o ya se encontró un usuario anónimo, no hacemos nada.
     if (req.isUserAuthenticated || req.anonymousUser) {
         return;
     }
     
-    // Si no hay usuario ni anónimo, significa que no se envió un ID anónimo válido.
-    // Creamos uno nuevo para que la ruta funcione correctamente.
     const newAnonymousId = uuidv4();
     const newAnonymousUser = new AnonymousUser({
         anonymousId: newAnonymousId,
         limenCurrentMonthUsage: 0,
-        limenMonthlyLimit: process.env.LIMEN_ANON_LIMIT || 25, // **[CAMBIO AQUÍ]** Límite para anónimos
+        limenMonthlyLimit: process.env.LIMEN_ANON_LIMIT || 25,
     });
     await newAnonymousUser.save();
 
-    // Actualizamos el objeto de la solicitud para que la ruta lo use
     req.anonymousUser = newAnonymousUser;
     req.limenUsage = newAnonymousUser.limenCurrentMonthUsage;
     req.limenLimit = newAnonymousUser.limenMonthlyLimit;
 
-    // Enviamos el nuevo ID en el encabezado de la respuesta
     res.setHeader('X-Set-Anonymous-ID', newAnonymousId);
 };
 
-/**
- * @desc    Ruta para procesar un 'impulso' del frontend.
- * @route   POST /api/limen/impulse
- * @access  Public/Private (el middleware checkUsage gestiona los límites)
- */
 router.post('/impulse', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
 
@@ -130,11 +115,6 @@ router.post('/impulse', checkUsage, async (req, res) => {
     }
 });
 
-/**
- * @desc    Genera una revelación/guía con IA.
- * @route   POST /api/limen/get-revelation
- * @access  Public/Private (el middleware checkUsage gestiona los límites)
- */
 router.post('/get-revelation', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
 
@@ -155,7 +135,7 @@ router.post('/get-revelation', checkUsage, async (req, res) => {
 
     console.log(`[LÍMEN Backend] Generando revelación para ${user ? user.userName : 'Anónimo'}`);
 
-    const prompt = `Genera un mensaje de una "voz arquitectónica" para un explorador espiritual. El mensaje debe ser largo, simbólico, filosófico y ofrecer una visión elevada, no un consejo directo. Utiliza metáforas complejas, analogías de estructuras cósmicas o conceptos de geometría sagrada. La voz debe ser majestuosa y enigmática. Si conoces el nombre del usuario ("${user ? user.userName : 'explorador'}") puedes intentar incorporarlo sutilmente. El mensaje debe ser significativamente más largo y detallado que una simple frase de sabiduría. Ejemplo: "En la vasta arquitectura del pensamiento, cada silencio es un pilar. Tu esencia, explorador, es el cimiento de un templo que aún no has construido, un espacio donde la luz y la sombra dialogan en un lenguaje de formas puras. Escucha el eco de la forma que deseas manifestar."`;
+    const prompt = `Genera un mensaje de una "voz arquitectónica" para un explorador espiritual. El mensaje debe ser largo, simbólico, filosófico y ofrecer una visión elevada, no un consejo directo. Utiliza metáforas complejas, analogías de estructuras cósmicas o conceptos de geometría sagrada. La voz debe ser majestuosa y enigmática. Si conoces el nombre del usuario ("${user ? user.userName : 'explorador'}") puedes intentar incorporarlo sutilmente. El mensaje debe ser significativamente más largo y detallado que una simple frase de sabiduría. Utiliza formato **Markdown** para estructurar la respuesta, incluyendo negritas y saltos de línea para mejorar la legibilidad. Ejemplo: "En la vasta arquitectura del pensamiento, cada silencio es un pilar. Tu esencia, explorador, es el cimiento de un templo que aún no has construido, un espacio donde la luz y la sombra dialogan en un lenguaje de formas puras. Escucha el eco de la forma que deseas manifestar."`;
 
     try {
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
@@ -216,11 +196,6 @@ router.post('/get-revelation', checkUsage, async (req, res) => {
     }
 });
 
-/**
- * @desc    Recibe una duda o pregunta y responde con una "respuesta simbólica".
- * @route   POST /api/limen/doubt
- * @access  Public/Private (el middleware checkUsage gestiona los límites)
- */
 router.post('/doubt', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
 
@@ -307,11 +282,6 @@ router.post('/doubt', checkUsage, async (req, res) => {
     }
 });
 
-/**
- * @desc    Activa un ritual y registra el evento.
- * @route   POST /api/limen/ritual
- * @access  Public/Private (el middleware checkUsage gestiona los límites)
- */
 router.post('/ritual', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
 
@@ -376,11 +346,6 @@ router.post('/ritual', checkUsage, async (req, res) => {
     }
 });
 
-/**
- * @desc    Obtiene el historial de Limen para el usuario autenticado.
- * @route   GET /api/limen/history
- * @access  Private
- */
 router.get('/history', checkUsage, async (req, res) => {
     if (!req.isUserAuthenticated) {
         return res.status(403).json({ message: 'Debes iniciar sesión para ver tu historial con Límen.' });
