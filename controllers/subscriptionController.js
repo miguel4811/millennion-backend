@@ -1,3 +1,4 @@
+// millennion/backend/routes/subscriptionController.js
 const User = require('../models/User');
 const axios = require('axios');
 
@@ -69,8 +70,10 @@ const generateAccessToken = async () => {
 };
 
 // ** IDs reales de tus planes de suscripción de PayPal en el entorno Live **
+// --- ¡ATENCIÓN! ---
+// El 'ID_DEL_PLAN_ESSENTIAL' ha sido actualizado con el ID que proporcionaste.
 const planToPayPalPlanId = {
-    Essential: 'P-3VR6834ML9882119NCDHUUY',
+    Essential: 'P-3VR86834ML9882119NCDHUUY', // <--- ID corregido
     Forjador: 'P-5RL977229K126853LNCDHXPQ',
     Visionario: 'P-01W50725YJ103935FNCDHYGQ',
 };
