@@ -3,6 +3,7 @@ require('dotenv').config(); // Carga las variables de entorno desde .env al inic
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors'); // Importa el módulo CORS
+const path = require('path'); // Módulo nativo para trabajar con rutas de archivos
 
 // Importar rutas y middlewares
 const userRoutes = require('./routes/Users'); // Rutas para gestión de usuarios (login, register, profile)
@@ -68,9 +69,14 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/engine', engineRoutes);
 
 
-// Ruta de bienvenida (opcional, para verificar que el servidor está corriendo)
-app.get('/', (req, res) => {
-    res.send('Servidor de Millennion BDD funcionando. Accede a las rutas de API.');
+// Servir archivos estáticos del frontend
+// Esto es crucial para que Render sepa dónde encontrar tu aplicación React
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
+
+// Para manejar el enrutamiento de React, cualquier ruta no reconocida por el backend
+// se redirige a index.html. Esto evita los errores 404 en el frontend.
+app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '..', 'frontend', 'dist', 'index.html'));
 });
 
 // 7. Manejo de errores (middleware de último recurso)
