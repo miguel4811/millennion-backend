@@ -6,32 +6,36 @@ const cors = require('cors'); // Importa el módulo CORS
 const path = require('path'); // Módulo nativo para trabajar con rutas de archivos
 
 // Importar rutas y middlewares
+// Rutas de la API principal y sus sistemas
 const userRoutes = require('./routes/Users'); // Rutas para gestión de usuarios (login, register, profile)
 const subscriptionRoutes = require('./routes/subscriptionRoutes'); // Rutas de suscripción (PayPal)
 const adminRoutes = require('./routes/adminRoutes'); // Rutas de administración (para cron jobs, etc.)
 
-// Importar todas las rutas de los sistemas
+// Rutas de los sistemas de Millennion
 const limenRoutes = require('./routes/limenRoutes');
 const creanovaRoutes = require('./routes/creanovaRoutes');
-// IMPORTACIÓN DEL NUEVO MÓDULO
-const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes');
+const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes'); // NUEVO MÓDULO
 
-const sigmaRoutes = require('./systems/sigma'); // Asumo que estos siguen en systems
+// Rutas de sistemas que se asumen en la carpeta 'systems'
+const sigmaRoutes = require('./systems/sigma'); 
 const nexusRoutes = require('./systems/nexus');
 const financeRoutes = require('./systems/finance');
 const engineRoutes = require('./systems/engine');
 
-const { checkUsage } = require('./middleware/usageMiddleware'); // ¡NUEVO! Middleware para verificar uso (anónimo/autenticado)
+// Middleware para verificar uso (anónimo/autenticado)
+const { checkUsage } = require('./middleware/usageMiddleware'); 
 
 // 2. Inicializar la aplicación Express
 const app = express();
 
 // 3. Configuración de middlewares
-// Configuración de CORS: Permite solicitudes solo desde tus frontends
+// Configuración de CORS para permitir solicitudes solo desde tus frontends
 const corsOptions = {
-    origin: ['https://millennionbdd.com', 'https://www.millennionbdd.com'], // ¡AQUÍ ESTÁ EL CAMBIO! Ahora acepta ambos dominios.
+    // Acepta ambos dominios para el frontend
+    origin: ['https://millennionbdd.com', 'https://www.millennionbdd.com'], 
     optionsSuccessStatus: 200, // Para navegadores antiguos
-    exposedHeaders: ['X-Set-Anonymous-ID'] // ¡IMPORTANTE! Exponer este encabezado para que el frontend pueda leerlo
+    // Permite que el frontend lea este encabezado para manejar sesiones anónimas
+    exposedHeaders: ['X-Set-Anonymous-ID']
 };
 app.use(cors(corsOptions)); // Habilita CORS con las opciones definidas
 app.use(express.json()); // Permite a Express parsear cuerpos de petición JSON
@@ -49,27 +53,25 @@ mongoose.connect(mongoUri)
 // 5. Configuración de la clave secreta de JWT (ya está en .env y se usa en middleware)
 
 // 6. Definición de Rutas de la API
+// Rutas que no requieren 'checkUsage'
 app.use('/api/users', userRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Rutas de los sistemas. Ahora usan 'checkUsage' para permitir acceso anónimo limitado.
-// NOTA: Si sigma, nexus, finance, engine también deben permitir uso anónimo,
-// necesitarás aplicar 'checkUsage' y adaptar su lógica de límites.
-app.use('/api/limen', checkUsage, limenRoutes); // Aplica checkUsage a las rutas de Limen
-app.use('/api/creanova', checkUsage, creanovaRoutes); // Aplica checkUsage a las rutas de Creanova
-// RUTA DEL NUEVO MÓDULO "APRENDE DE NEGOCIOS"
+// Rutas de los sistemas que usan 'checkUsage' para permitir acceso anónimo limitado.
+// Este middleware verifica si el usuario es anónimo o autenticado y ajusta los límites.
+app.use('/api/limen', checkUsage, limenRoutes); 
+app.use('/api/creanova', checkUsage, creanovaRoutes); 
 app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 
-
-// Asumo que estas rutas siguen requiriendo autenticación completa por ahora
+// Rutas de los sistemas que asumen una autenticación completa (protegidas por el middleware 'protect')
 app.use('/api/sigma', sigmaRoutes);
 app.use('/api/nexus', nexusRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/engine', engineRoutes);
 
 
-// Servir archivos estáticos del frontend
+// 7. Servir archivos estáticos del frontend
 // Esto es crucial para que Render sepa dónde encontrar tu aplicación React
 app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 
@@ -79,15 +81,15 @@ app.get('*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '..', 'frontend', 'dist', 'index.html'));
 });
 
-// 7. Manejo de errores (middleware de último recurso)
+// 8. Manejo de errores (middleware de último recurso)
 // Es crucial que este middleware esté después de todas tus rutas
 app.use((err, req, res, next) => {
     console.error(err.stack); // Registra el stack trace del error
-    // CAMBIO IMPORTANTE: Ahora enviamos un objeto JSON con el error.
+    // Se envía una respuesta de error en formato JSON al cliente
     res.status(500).json({ message: 'Algo salió mal en el servidor!' });
 });
 
-// 8. Iniciar el servidor
+// 9. Iniciar el servidor
 const PORT = process.env.PORT || 3001; // Puerto del servidor, usa el de .env o 3001 por defecto
 
 app.listen(PORT, () => {
