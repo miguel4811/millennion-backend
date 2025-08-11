@@ -135,7 +135,19 @@ router.post('/get-revelation', checkUsage, async (req, res) => {
 
     console.log(`[LÍMEN Backend] Generando revelación para ${user ? user.userName : 'Anónimo'}`);
 
-    const prompt = `Genera un mensaje de una "voz arquitectónica" para un explorador espiritual. El mensaje debe ser largo, simbólico, filosófico y ofrecer una visión elevada, no un consejo directo. Utiliza metáforas complejas, analogías de estructuras cósmicas o conceptos de geometría sagrada. La voz debe ser majestuosa y enigmática. Si conoces el nombre del usuario ("${user ? user.userName : 'explorador'}") puedes intentar incorporarlo sutilmente. El mensaje debe ser significativamente más largo y detallado que una simple frase de sabiduría. Utiliza formato **Markdown** para estructurar la respuesta, incluyendo negritas y saltos de línea para mejorar la legibilidad. Ejemplo: "En la vasta arquitectura del pensamiento, cada silencio es un pilar. Tu esencia, explorador, es el cimiento de un templo que aún no has construido, un espacio donde la luz y la sombra dialogan en un lenguaje de formas puras. Escucha el eco de la forma que deseas manifestar."`;
+    // --- CORRECCIÓN AQUÍ: Prompt más explícito para el formato ---
+    const prompt = `Genera un mensaje de una "voz arquitectónica" para un explorador espiritual. El mensaje debe ser largo, simbólico, filosófico y ofrecer una visión elevada, no un consejo directo. Utiliza metáforas complejas, analogías de estructuras cósmicas o conceptos de geometría sagrada. La voz debe ser majestuosa y enigmática. Si conoces el nombre del usuario ("${user ? user.userName : 'explorador'}") puedes intentar incorporarlo sutilmente. El mensaje debe ser significativamente más largo y detallado que una simple frase de sabiduría. 
+    
+    Es crucial que utilices formato **Markdown** para estructurar la respuesta. Cada nueva idea o concepto debe comenzar en una nueva línea y usar **negritas** para resaltar las palabras clave. Por ejemplo:
+    
+    **Concepto 1**
+    Mensaje relacionado con el concepto 1.
+    
+    **Concepto 2**
+    Mensaje relacionado con el concepto 2.
+    
+    Asegúrate de que la respuesta tenga al menos 6-7 párrafos separados por saltos de línea para una mejor legibilidad.`;
+    // --- FIN DE LA CORRECCIÓN ---
 
     try {
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
