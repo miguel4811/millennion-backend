@@ -1,12 +1,14 @@
+// userController.js
+
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const { updatePlanLimits } = require('./subscriptionController'); 
 
-// @desc    Registrar un nuevo usuario
-// @route   POST /api/users/register
-// @access  Public
+// @desc    Registrar un nuevo usuario
+// @route   POST /api/users/register
+// @access  Public
 const registerUser = async (req, res) => {
     const { userName, email, password } = req.body;
 
@@ -33,6 +35,9 @@ const registerUser = async (req, res) => {
         user.plan = 'Free';
         user.creanovaMonthlyLimit = 10;
         user.limenMonthlyLimit = 25; // **[CAMBIO AQUÍ]** de 15 a 25
+        // AHORA INICIALIZAMOS LOS LÍMITES PARA EL NUEVO MÓDULO "APRENDE DE NEGOCIOS"
+        user.aprendeNegociosMonthlyLimit = 30;
+        user.aprendeNegociosCurrentMonthUsage = 0;
         
         // Propiedades adicionales
         user.level = 1;
@@ -57,6 +62,9 @@ const registerUser = async (req, res) => {
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
                 limenMonthlyLimit: user.limenMonthlyLimit,
+                // AHORA DEVOLVEMOS LOS LÍMITES EN LA RESPUESTA
+                aprendeNegociosMonthlyLimit: user.aprendeNegociosMonthlyLimit,
+                aprendeNegociosCurrentMonthUsage: user.aprendeNegociosCurrentMonthUsage,
                 level: user.level,
                 coherentDecisions: user.coherentDecisions,
                 structuralPatterns: user.structuralPatterns,
@@ -75,9 +83,9 @@ const registerUser = async (req, res) => {
     }
 };
 
-// @desc    Autenticar un usuario y obtener token
-// @route   POST /api/users/login
-// @access  Public
+// @desc    Autenticar un usuario y obtener token
+// @route   POST /api/users/login
+// @access  Public
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
@@ -111,6 +119,9 @@ const loginUser = async (req, res) => {
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
                 limenMonthlyLimit: user.limenMonthlyLimit,
+                // AHORA DEVOLVEMOS LOS LÍMITES EN LA RESPUESTA
+                aprendeNegociosMonthlyLimit: user.aprendeNegociosMonthlyLimit || 30, // Usa el valor guardado o el valor por defecto
+                aprendeNegociosCurrentMonthUsage: user.aprendeNegociosCurrentMonthUsage || 0, // Usa el valor guardado o el valor por defecto
                 paypalSubscriptionId: user.paypalSubscriptionId,
                 paypalSubscriptionStatus: user.paypalSubscriptionStatus,
                 level: user.level,
@@ -127,9 +138,9 @@ const loginUser = async (req, res) => {
     }
 };
 
-// @desc    Obtener datos del perfil del usuario (requiere autenticación)
-// @route   GET /api/users/profile
-// @access  Private
+// @desc    Obtener datos del perfil del usuario (requiere autenticación)
+// @route   GET /api/users/profile
+// @access  Private
 const getUserProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
