@@ -16,12 +16,6 @@ const limenRoutes = require('./routes/limenRoutes');
 const creanovaRoutes = require('./routes/creanovaRoutes');
 const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes'); // NUEVO: Importa la ruta del nuevo módulo
 
-// Rutas de sistemas que se asumen en la carpeta 'systems'
-const sigmaRoutes = require('./systems/sigma'); 
-const nexusRoutes = require('./systems/nexus');
-const financeRoutes = require('./systems/finance');
-const engineRoutes = require('./systems/engine');
-
 // Middleware para verificar uso (anónimo/autenticado)
 const { checkUsage } = require('./middleware/usageMiddleware'); 
 
@@ -63,12 +57,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/limen', checkUsage, limenRoutes); 
 app.use('/api/creanova', checkUsage, creanovaRoutes); 
 app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes); // NUEVO: Ruta para el módulo Aprende de Negocios
-
-// Rutas de los sistemas que asumen una autenticación completa (protegidas por el middleware 'protect')
-app.use('/api/sigma', sigmaRoutes);
-app.use('/api/nexus', nexusRoutes);
-app.use('/api/finance', financeRoutes);
-app.use('/api/engine', engineRoutes);
 
 
 // 7. Servir archivos estáticos del frontend
