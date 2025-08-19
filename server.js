@@ -14,6 +14,7 @@ const adminRoutes = require('./routes/adminRoutes'); // Rutas de administración
 // Rutas de los sistemas de Millennion
 const limenRoutes = require('./routes/limenRoutes');
 const creanovaRoutes = require('./routes/creanovaRoutes');
+const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes'); // NUEVO: Importa la ruta del nuevo módulo
 
 // Rutas de sistemas que se asumen en la carpeta 'systems'
 const sigmaRoutes = require('./systems/sigma'); 
@@ -61,6 +62,7 @@ app.use('/api/admin', adminRoutes);
 // Este middleware verifica si el usuario es anónimo o autenticado y ajusta los límites.
 app.use('/api/limen', checkUsage, limenRoutes); 
 app.use('/api/creanova', checkUsage, creanovaRoutes); 
+app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes); // NUEVO: Ruta para el módulo Aprende de Negocios
 
 // Rutas de los sistemas que asumen una autenticación completa (protegidas por el middleware 'protect')
 app.use('/api/sigma', sigmaRoutes);
