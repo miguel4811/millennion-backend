@@ -41,13 +41,7 @@ app.use('/api/limen', checkUsage, limenRoutes);
 app.use('/api/creanova', checkUsage, creanovaRoutes); 
 app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 
-app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
-
-// Ruta comodín corregida con una expresión regular
-// Esto evita el error de "Missing parameter name"
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.resolve(__dirname, '..', 'frontend', 'dist', 'index.html'));
-});
+// **Eliminadas las líneas que servían el frontend**
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
