@@ -135,7 +135,6 @@ router.post('/get-revelation', checkUsage, async (req, res) => {
 
     console.log(`[LÍMEN Backend] Generando revelación para ${user ? user.userName : 'Anónimo'}`);
 
-    // --- CORRECCIÓN AQUÍ: Prompt más explícito para el formato ---
     const prompt = `Genera un mensaje de una "voz arquitectónica" para un explorador espiritual. El mensaje debe ser largo, simbólico, filosófico y ofrecer una visión elevada, no un consejo directo. Utiliza metáforas complejas, analogías de estructuras cósmicas o conceptos de geometría sagrada. La voz debe ser majestuosa y enigmática. Si conoces el nombre del usuario ("${user ? user.userName : 'explorador'}") puedes intentar incorporarlo sutilmente. El mensaje debe ser significativamente más largo y detallado que una simple frase de sabiduría. 
     
     Es crucial que utilices formato **Markdown** para estructurar la respuesta. Cada nueva idea o concepto debe comenzar en una nueva línea y usar **negritas** para resaltar las palabras clave. Por ejemplo:
@@ -147,7 +146,6 @@ router.post('/get-revelation', checkUsage, async (req, res) => {
     Mensaje relacionado con el concepto 2.
     
     Asegúrate de que la respuesta tenga al menos 6-7 párrafos separados por saltos de línea para una mejor legibilidad.`;
-    // --- FIN DE LA CORRECCIÓN ---
 
     try {
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
