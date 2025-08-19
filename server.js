@@ -43,7 +43,9 @@ app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 
-app.get('*', (req, res) => {
+// Ruta comodín corregida para Express v5+
+// Usa un comodín con nombre para capturar todas las rutas de frontend
+app.get('/*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '..', 'frontend', 'dist', 'index.html'));
 });
 
