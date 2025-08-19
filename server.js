@@ -1,28 +1,30 @@
-// server.js (para depuración)
-
 // 1. Importar módulos necesarios
-require('dotenv').config();
+require('dotenv').config(); // Carga las variables de entorno desde .env al inicio
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
+const cors = require('cors'); // Importa el módulo CORS
+const path = require('path'); // Módulo nativo para trabajar con rutas de archivos
 
 // Importar rutas y middlewares
+// Rutas de la API principal y sus sistemas
 const userRoutes = require('./routes/Users');
-const subscriptionRoutes = require('./routes/subscriptionRoutes'); // COMENTADA TEMPORALMENTE
-const adminRoutes = require('./routes/adminRoutes'); // COMENTADA TEMPORALMENTE
-const limenRoutes = require('./routes/limenRoutes'); // COMENTADA TEMPORALMENTE
-const creanovaRoutes = require('./routes/creanovaRoutes'); // COMENTADA TEMPORALMENTE
-const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes'); // COMENTADA TEMPORALMENTE
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
-const { checkUsage } = require('./middleware/usageMiddleware'); // COMENTADA TEMPORALMENTE
+// Rutas de los sistemas de Millennion
+const limenRoutes = require('./routes/limenRoutes');
+const creanovaRoutes = require('./routes/creanovaRoutes');
+const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes');
+
+// Importamos el middleware aquí, en lugar de arriba.
+const { checkUsage } = require('./middleware/usageMiddleware');
 
 // 2. Inicializar la aplicación Express
 const app = express();
 
 // 3. Configuración de middlewares
 const corsOptions = {
-    origin: ['https://millennionbdd.com', 'https://www.millennionbdd.com'],
+    origin: ['https://millennionbdd.com', 'https://www.millennionbdd.com'], 
     optionsSuccessStatus: 200,
     exposedHeaders: ['X-Set-Anonymous-ID']
 };
@@ -44,13 +46,13 @@ mongoose.connect(mongoUri)
 // 6. Definición de Rutas de la API
 // Rutas que no requieren 'checkUsage'
 app.use('/api/users', userRoutes);
-// app.use('/api/subscriptions', subscriptionRoutes); // COMENTADA
-// app.use('/api/admin', adminRoutes); // COMENTADA
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/admin', adminRoutes);
 
-// Rutas de los sistemas que usan 'checkUsage'
-// app.use('/api/limen', checkUsage, limenRoutes); // COMENTADA
-// app.use('/api/creanova', checkUsage, creanovaRoutes); // COMENTADA
-// app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes); // COMENTADA
+// Rutas de los sistemas que usan 'checkUsage' para permitir acceso anónimo limitado.
+app.use('/api/limen', checkUsage, limenRoutes); 
+app.use('/api/creanova', checkUsage, creanovaRoutes); 
+app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 
 // 7. Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
@@ -59,7 +61,7 @@ app.get('*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '..', 'frontend', 'dist', 'index.html'));
 });
 
-// 8. Manejo de errores
+// 8. Manejo de errores (middleware de último recurso)
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ message: 'Algo salió mal en el servidor!' });
