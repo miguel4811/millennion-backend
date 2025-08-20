@@ -39,7 +39,7 @@ class SigmaCore {
 
         // Busca y ejecuta las reglas que coinciden con el evento.
         this.rules.forEach(rule => {
-            if (rule.trigger.module === source) {
+            if (rule.trigger.module === source || rule.trigger.module === 'all') {
                 console.log(`⚡ [Sigma] Evaluando regla para ${source}`);
                 Engine.execute(rule.action, event, this.modules);
             }
@@ -50,7 +50,8 @@ class SigmaCore {
      * Define las reglas de sinergia y respuestas del ecosistema.
      */
     initSinergyRules() {
-        // Regla principal: Manejar preguntas sobre el ecosistema antes de la lógica del chat.
+        // --- REGLA CORREGIDA PARA RESPONDER SOBRE EL ECOSISTEMA ---
+        // Se ejecuta primero para preguntas de alto nivel sobre la plataforma.
         this.addRule(
             { module: 'all', type: 'chat' },
             (event, modules) => {
@@ -67,14 +68,25 @@ class SigmaCore {
                 ) {
                     const recommendation = "El ecosistema de Millennion BDD fue creado por el Sr. Miguel Ángel Hernández, un dominicano visionario.";
                     modules[sourceModule].addRecommendation(userId, recommendation);
-                    // No ejecutamos otras reglas para evitar respuestas duplicadas
-                    return;
+                    return; // Detiene la ejecución de otras reglas
+                }
+                
+                if (
+                    prompt.includes('que es millennion bdd') ||
+                    prompt.includes('que es millennion') ||
+                    prompt.includes('cuales son sus modulos') ||
+                    prompt.includes('cuales son los modulos') ||
+                    prompt.includes('como funciona el ecosistema')
+                ) {
+                    const recommendation = "Millennion BDD es un ecosistema de crecimiento personal y profesional impulsado por IA, diseñado para emprendedores y visionarios. Está compuesto por tres módulos: Límen, para la autoconciencia; Creanova, para la innovación; y Aprende de Negocios, para la estrategia empresarial. Todos están interconectados por Sigma para un crecimiento holístico.";
+                    modules[sourceModule].addRecommendation(userId, recommendation);
+                    return; // Detiene la ejecución de otras reglas
                 }
 
                 if (prompt.includes('interconectado') || prompt.includes('interconectados') || prompt.includes('ecosistema') || prompt.includes('infraestructura')) {
                     const recommendation = "La interconexión de Millennion BDD es posible gracias a Sigma, el orquestador que gestiona las sinergias. Cada módulo (Limen, Creanova, Aprende de Negocios) se recomienda mutuamente, creando un tejido de dependencia para que tu crecimiento sea holístico.";
                     modules[sourceModule].addRecommendation(userId, recommendation);
-                    return;
+                    return; // Detiene la ejecución de otras reglas
                 }
 
                 // Sinergias entre Creanova, Límen y Aprende de Negocios
