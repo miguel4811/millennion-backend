@@ -4,13 +4,17 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
+// Importaciones de rutas existentes
 const userRoutes = require('./routes/Users');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-
 const limenRoutes = require('./routes/limenRoutes');
 const creanovaRoutes = require('./routes/creanovaRoutes');
 const aprendeNegociosRoutes = require('./routes/aprendeNegociosRoutes');
+
+// Importaciones de las nuevas rutas para Sigma y Engine
+const sigmaRoutes = require('./routes/sigmaRoutes'); 
+const engineRoutes = require('./routes/engineRoutes');
 
 const { checkUsage } = require('./middleware/usageMiddleware');
 
@@ -33,15 +37,17 @@ mongoose.connect(mongoUri)
         process.exit(1);
     });
 
+// Uso de rutas existentes
 app.use('/api/users', userRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
-
 app.use('/api/limen', checkUsage, limenRoutes); 
 app.use('/api/creanova', checkUsage, creanovaRoutes); 
 app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 
-// **Eliminadas las líneas que servían el frontend**
+// Uso de las nuevas rutas para Sigma y Engine
+app.use('/api/sigma', checkUsage, sigmaRoutes); 
+app.use('/api/engine', checkUsage, engineRoutes); 
 
 app.use((err, req, res, next) => {
     console.error(err.stack);

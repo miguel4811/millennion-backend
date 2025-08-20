@@ -1,3 +1,4 @@
+// creanovaRoutes.js
 const express = require('express');
 const router = express.Router();
 const { checkUsage } = require('../middleware/usageMiddleware');
@@ -5,18 +6,28 @@ const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 const CreanovaEntry = require('../models/CreanovaEntry');
 
+// *** Nuevo: Importar Sigma y Engine para la interconexión ***
+const Sigma = require('./sigmaRoutes.js');
+const Engine = require('./engineRoutes.js');
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-// --- Endpoint para el Chat con Creanova ---
+// *** Nuevo: Objeto para guardar las recomendaciones pendientes para cada usuario ***
+const recommendations = {};
+
+// *** Nuevo: Función que Engine usará para enviar recomendaciones a este módulo ***
+router.addRecommendation = (userId, message) => {
+    recommendations[userId] = message;
+};
+
+// Endpoint para el Chat con Creanova
 // POST /api/creanova/chat
 router.post('/chat', checkUsage, async (req, res) => {
-    // Los datos del usuario (autenticado o anónimo) y los límites vienen de checkUsage
     const user = req.user;
     const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
 
-    // Aquí se utiliza req.creanovaLimit, que se define en el middleware checkUsage
     const currentUsage = req.creanovaUsage;
     const monthlyLimit = req.creanovaLimit;
 
@@ -37,6 +48,14 @@ router.post('/chat', checkUsage, async (req, res) => {
 
     try {
         console.log(`[CREANOVA Backend] Generando idea para ${user ? user.userName : 'Anónimo'} con prompt: "${userPrompt}"`);
+
+        // *** Nuevo: Notificar a Sigma sobre el evento de chat ***
+        const userId = user ? user._id : anonymousUser ? anonymousUser.anonymousId : 'anonymous';
+        Sigma.notify('creanova', {
+            type: 'chat',
+            userId: userId,
+            prompt: userPrompt
+        });
 
         const formattedHistory = conversationHistory.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'model',
@@ -86,7 +105,6 @@ router.post('/chat', checkUsage, async (req, res) => {
             await anonymousUser.save();
         }
 
-        // Guarda la entrada de Creanova en la base de datos
         if (CreanovaEntry) {
             const newEntry = new CreanovaEntry({
                 userId: user ? user._id : null,
@@ -102,8 +120,15 @@ router.post('/chat', checkUsage, async (req, res) => {
             console.warn("CreanovaEntry model not found. Skipping saving idea to DB.");
         }
 
+        // *** Nuevo: Obtener la recomendación si existe ***
+        const recommendation = recommendations[userId] || null;
+        if (recommendation) {
+            delete recommendations[userId];
+        }
+
         res.json({
             response: generatedIdea,
+            recommendation: recommendation, // Añadimos el campo de recomendación
             usage: user ? user.creanovaCurrentMonthUsage : (anonymousUser ? anonymousUser.creanovaCurrentMonthUsage : 0),
             limit: user ? user.creanovaMonthlyLimit : (anonymousUser ? anonymousUser.creanovaMonthlyLimit : 0),
             isUserAuthenticated: isUserAuthenticated
@@ -115,7 +140,7 @@ router.post('/chat', checkUsage, async (req, res) => {
     }
 });
 
-// --- Endpoint para Obtener ideas de proyecto del usuario (Solo para autenticados) ---
+// Endpoint para Obtener ideas de proyecto del usuario (Solo para autenticados)
 // GET /api/creanova/user-ideas
 router.get('/user-ideas', checkUsage, async (req, res) => {
     if (!req.isUserAuthenticated) {
