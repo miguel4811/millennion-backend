@@ -39,7 +39,6 @@ mongoose.connect(mongoUri)
     });
 
 // Uso de rutas de la API
-// Las rutas de Sigma y Engine fueron removidas de aquí, ya que no son routers de Express.
 app.use('/api/users', userRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
@@ -51,6 +50,13 @@ app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ message: 'Algo salió mal en el servidor!' });
+});
+
+// *** Nuevo: Inicializar Sigma con los módulos de chat ***
+Sigma.registerModules({
+    limen: limenRoutes,
+    creanova: creanovaRoutes,
+    aprendeNegocios: aprendeNegociosRoutes
 });
 
 const PORT = process.env.PORT || 3001;

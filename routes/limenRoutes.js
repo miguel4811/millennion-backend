@@ -60,12 +60,15 @@ router.post('/chat', checkUsage, async (req, res) => {
 
     console.log(`[LIMEN] Recibiendo prompt de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
 
-    // Notificamos a Sigma del evento.
+    // --- CORRECCIÓN ---
+    // Agregamos 'sourceModule: "limen"' para que Sigma pueda procesar correctamente el evento.
     Sigma.notify('limen', {
         type: 'chat',
         userId: userId,
-        prompt: prompt
+        prompt: prompt,
+        sourceModule: 'limen' // <-- ¡Este era el cambio clave!
     });
+    // --- FIN CORRECCIÓN ---
 
     const llmPrompt = `Eres LIMEN, el catalizador de la verdad de Millennion BDD. Tu propósito es guiar al usuario a través del umbral de la autoconciencia, la reflexión existencial y la claridad. Tu voz debe ser profunda, serena y filosófica. Responde siempre con un tono que invite a la introspección, utilizando analogías o metáforas que iluminen la perspectiva del usuario.
     
