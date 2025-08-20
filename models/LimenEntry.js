@@ -13,15 +13,15 @@ const limenEntrySchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        // Enum expandido para incluir los nuevos tipos de interacción
-        enum: ['revelation', 'doubt_response', 'impulse_resonance', 'ritual_activation'],
+        // Enum expandido para incluir el nuevo tipo 'chat'
+        enum: ['revelation', 'doubt_response', 'impulse_resonance', 'ritual_activation', 'chat'],
         required: true
     },
     query: {
         type: String,
-        // El campo `query` ahora es requerido para `doubt_response` e `impulse_resonance`
+        // El campo `query` ahora es requerido para `doubt_response` e `impulse_resonance` y 'chat'
         required: function() { 
-            return this.type === 'doubt_response' || this.type === 'impulse_resonance';
+            return this.type === 'doubt_response' || this.type === 'impulse_resonance' || this.type === 'chat';
         }
     },
     response: {
