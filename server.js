@@ -38,14 +38,14 @@ mongoose.connect(mongoUri)
         process.exit(1);
     });
 
-// Uso de rutas de la API. Aquí es donde se eliminó la línea problemática.
+// Uso de rutas de la API
+// Las rutas de Sigma y Engine fueron removidas de aquí, ya que no son routers de Express.
 app.use('/api/users', userRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/limen', checkUsage, limenRoutes);
 app.use('/api/creanova', checkUsage, creanovaRoutes);
 app.use('/api/aprende-negocios', checkUsage, aprendeNegociosRoutes);
-app.use('/api/engine', checkUsage, engineRoutes);
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
