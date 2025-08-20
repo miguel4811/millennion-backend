@@ -43,7 +43,8 @@ router.addRecommendation = (userId, message) => {
 };
 
 // Nueva ruta para manejar el chat
-router.post('/chat', checkUsage, async (req, res) => {
+// *** CORRECCIÓN: Se eliminó checkUsage de esta línea ***
+router.post('/chat', async (req, res) => {
     await ensureAnonymousUser(req, res);
     
     const user = req.user;
