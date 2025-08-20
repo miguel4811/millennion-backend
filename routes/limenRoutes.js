@@ -7,9 +7,9 @@ const AnonymousUser = require('../models/AnonymousUser');
 const LimenEntry = require('../models/LimenEntry');
 const { checkUsage } = require('../middleware/usageMiddleware');
 
-// *** Nuevo: Importar Sigma y Engine para la interconexión ***
-const Sigma = require('./sigmaRoutes.js');
-const Engine = require('./engineRoutes.js');
+// ** Eliminadas las importaciones de Sigma y Engine, ya que no son necesarias aquí. **
+// const Sigma = require('./sigmaRoutes.js');
+// const Engine = require('./engineRoutes.js');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
@@ -61,12 +61,9 @@ router.post('/chat', async (req, res) => {
 
     console.log(`[LIMEN] Recibiendo prompt de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
 
-    // *** Nuevo: Notificar a Sigma sobre el evento de chat, para que decida si hay una recomendación ***
-    Sigma.notify('limen', {
-        type: 'chat',
-        userId: userId,
-        prompt: prompt
-    });
+    // ** La línea `Sigma.notify()` no se puede usar aquí sin importar el módulo. **
+    // Si necesitas que Limen notifique a Sigma, deberíamos hacer el ajuste en `server.js`
+    // para que la comunicación se maneje a ese nivel.
 
     // *** MODIFICACIÓN CLAVE: El prompt ahora define la personalidad del mentor ***
     const llmPrompt = `Eres LIMEN, el catalizador de la verdad de Millennion BDD. Tu propósito es guiar al usuario a través del umbral de la autoconciencia, la reflexión existencial y la claridad. Tu voz debe ser profunda, serena y filosófica. Responde siempre con un tono que invite a la introspección, utilizando analogías o metáforas que iluminen la perspectiva del usuario.
