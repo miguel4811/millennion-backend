@@ -19,7 +19,6 @@ class EngineCore {
 
     /**
      * Entrega una recomendación a un módulo de destino.
-     * Esta función es el "puente" que Sigma llama para que Engine la ejecute.
      * @param {Object} data - Objeto que contiene los detalles de la recomendación.
      * @param {string} data.targetModule - El nombre del módulo al que se enviará la recomendación.
      * @param {Object} data.recommendation - El contenido de la recomendación.
@@ -41,4 +40,6 @@ class EngineCore {
 }
 
 const Engine = new EngineCore();
-export default Engine;
+
+// Exportamos la instancia para que pueda ser requerida por otros archivos
+module.exports = Engine;

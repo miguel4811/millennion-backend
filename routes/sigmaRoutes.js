@@ -1,8 +1,8 @@
 // sigmaRoutes.js
 // Sigma: ente central que dicta reglas y controla la comunicación entre módulos.
 
-// Importamos la clase Engine para poder enviar órdenes de ejecución.
-import Engine from "./engineRoutes.js";
+// Importamos la instancia de Engine usando require()
+const Engine = require("./engineRoutes.js");
 
 class SigmaCore {
     constructor() {
@@ -52,4 +52,6 @@ class SigmaCore {
 }
 
 const Sigma = new SigmaCore();
-export default Sigma;
+
+// Exportamos la instancia para que pueda ser requerida por otros archivos
+module.exports = Sigma;

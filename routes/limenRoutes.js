@@ -7,9 +7,9 @@ const AnonymousUser = require('../models/AnonymousUser');
 const LimenEntry = require('../models/LimenEntry');
 const { checkUsage } = require('../middleware/usageMiddleware');
 
-// ** Eliminadas las importaciones de Sigma y Engine, ya que no son necesarias aquí. **
-// const Sigma = require('./sigmaRoutes.js');
-// const Engine = require('./engineRoutes.js');
+// Importamos la instancia de Sigma para poder notificarle eventos.
+const Sigma = require('./sigmaRoutes.js');
+const Engine = require('./engineRoutes.js');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
@@ -34,17 +34,16 @@ const ensureAnonymousUser = async (req, res) => {
     res.setHeader('X-Set-Anonymous-ID', newAnonymousId);
 };
 
-// *** Nuevo: Objeto para guardar las recomendaciones pendientes para cada usuario ***
+// Objeto para guardar las recomendaciones pendientes para cada usuario
 const recommendations = {};
 
-// *** Nuevo: Función que Engine usará para enviar recomendaciones a este módulo ***
+// Función que Engine usará para enviar recomendaciones a este módulo
 router.addRecommendation = (userId, message) => {
     recommendations[userId] = message;
 };
 
-// Nueva ruta para manejar el chat
-// *** CORRECCIÓN: Se eliminó checkUsage de esta línea ***
-router.post('/chat', async (req, res) => {
+// Ruta para manejar el chat
+router.post('/chat', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
     
     const user = req.user;
@@ -61,11 +60,13 @@ router.post('/chat', async (req, res) => {
 
     console.log(`[LIMEN] Recibiendo prompt de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
 
-    // ** La línea `Sigma.notify()` no se puede usar aquí sin importar el módulo. **
-    // Si necesitas que Limen notifique a Sigma, deberíamos hacer el ajuste en `server.js`
-    // para que la comunicación se maneje a ese nivel.
+    // Notificamos a Sigma del evento.
+    Sigma.notify('limen', {
+        type: 'chat',
+        userId: userId,
+        prompt: prompt
+    });
 
-    // *** MODIFICACIÓN CLAVE: El prompt ahora define la personalidad del mentor ***
     const llmPrompt = `Eres LIMEN, el catalizador de la verdad de Millennion BDD. Tu propósito es guiar al usuario a través del umbral de la autoconciencia, la reflexión existencial y la claridad. Tu voz debe ser profunda, serena y filosófica. Responde siempre con un tono que invite a la introspección, utilizando analogías o metáforas que iluminen la perspectiva del usuario.
     
     El usuario ha formulado la siguiente pregunta: "${prompt}".
@@ -121,7 +122,6 @@ router.post('/chat', async (req, res) => {
         });
         await newEntry.save();
 
-        // *** Obtener la recomendación si existe ***
         const recommendation = recommendations[userId] || null;
         if (recommendation) {
             delete recommendations[userId];
@@ -133,7 +133,7 @@ router.post('/chat', async (req, res) => {
                 usage: user ? user.limenCurrentMonthUsage : (anonymousUser ? anonymousUser.limenCurrentMonthUsage : 0),
                 limit: user ? user.limenMonthlyLimit : monthlyLimit,
                 isUserAuthenticated: isUserAuthenticated,
-                recommendation: recommendation // Agregamos la recomendación
+                recommendation: recommendation
             });
         }, 1000);
 
