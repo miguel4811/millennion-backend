@@ -6,14 +6,21 @@ const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 const AprendenNegociosEntry = require('../models/AprendeNegociosEntry');
 const { checkUsage } = require('../middleware/usageMiddleware');
-
-// *** Importado para la interconexión ***
 const Sigma = require('./sigmaRoutes.js');
-const Engine = require('./engineRoutes.js');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
+// *** NUEVO: Objeto para almacenar el historial de conversación por usuario ***
+const chatHistory = {};
+
+// Objeto para guardar las recomendaciones pendientes
+const recommendations = {};
+router.addRecommendation = (userId, message) => {
+    recommendations[userId] = message;
+};
+
+// Middleware para asegurar un usuario anónimo
 const ensureAnonymousUser = async (req, res) => {
     if (req.isUserAuthenticated || req.anonymousUser) {
         return;
@@ -34,22 +41,12 @@ const ensureAnonymousUser = async (req, res) => {
     res.setHeader('X-Set-Anonymous-ID', newAnonymousId);
 };
 
-// *** Objeto para guardar las recomendaciones pendientes para cada usuario ***
-const recommendations = {};
-
-// *** Función que Engine usará para enviar recomendaciones a este módulo ***
-router.addRecommendation = (userId, message) => {
-    recommendations[userId] = message;
-};
-
-// Nueva ruta para manejar el chat
 router.post('/chat', checkUsage, async (req, res) => {
     await ensureAnonymousUser(req, res);
     
     const user = req.user;
     const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
-    const currentUsage = req.aprendeNegociosUsage;
     const monthlyLimit = req.aprendeNegociosLimit;
     const { prompt } = req.body;
     const userId = user ? user._id : anonymousUser ? anonymousUser.anonymousId : 'anonymous';
@@ -60,17 +57,24 @@ router.post('/chat', checkUsage, async (req, res) => {
 
     console.log(`[APRENDE DE NEGOCIOS] Recibiendo prompt de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
 
-    // *** Nuevo: Notificar a Sigma sobre el evento de chat, para que decida si hay una recomendación ***
+    // Notificar a Sigma, pero no hacer nada más de momento. La recomendación se procesará más adelante.
     Sigma.notify('aprendeNegocios', {
         type: 'chat',
         userId: userId,
         prompt: prompt
     });
 
-    // *** MODIFICACIÓN CLAVE: El prompt ahora define la personalidad del mentor ***
-    const llmPrompt = `Un usuario llamado "${user ? user.userName : 'explorador'}" ha pedido ayuda en el módulo "Aprende de Negocios" con la siguiente consulta: "${prompt}".
+    // *** NUEVO: Construir el prompt de la IA con el historial de la conversación ***
+    // 1. Iniciar el historial si no existe
+    if (!chatHistory[userId]) {
+        chatHistory[userId] = [];
+    }
 
-    Actúa como un **mentor de negocios de élite** y arquitecto de imperios. Tu rol no es solo dar información, sino moldear una mentalidad empresarial. Tu respuesta debe ser concisa, directa y orientada a la acción. Utiliza un tono motivador y enérgico, enfocado en estrategias prácticas y resultados.
+    // 2. Agregar el prompt del usuario al historial
+    chatHistory[userId].push({ role: 'user', parts: [{ text: prompt }] });
+
+    // 3. Crear el prompt principal para la IA, incluyendo la personalidad y el historial
+    const userPrompt = `Eres un mentor de negocios de élite y arquitecto de imperios. Tu rol no es solo dar información, sino moldear una mentalidad empresarial. Tu respuesta debe ser concisa, directa y orientada a la acción. Utiliza un tono motivador y enérgico, enfocado en estrategias prácticas y resultados.
     
     Considera los siguientes principios para tu respuesta:
     - **Piensa en sistemas, no en transacciones.**
@@ -79,12 +83,17 @@ router.post('/chat', checkUsage, async (req, res) => {
     - **Multiplica tus entradas de valor.**
     - **Analiza y absorbe conocimiento de los gigantes.**
     - **Actúa con audacia calculada.**
-
+    
     La respuesta debe usar **Markdown** para un formato claro y legible. Utiliza negritas para resaltar conceptos clave. Asegúrate de que la respuesta sea relevante para la consulta del usuario, ofreciendo consejos de alto valor que reflejen esta mentalidad.`;
-
+    
+    // El historial se convierte en la conversación
+    const conversation = [{ role: 'user', parts: [{ text: userPrompt }] }, ...chatHistory[userId]];
+    
     try {
-        const payload = { contents: [{ role: "user", parts: [{ text: llmPrompt }] }] };
-
+        const payload = {
+            contents: conversation
+        };
+        
         const llmResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -106,6 +115,15 @@ router.post('/chat', checkUsage, async (req, res) => {
             generatedResponse = llmResult.candidates[0].content.parts[0].text;
         }
 
+        // 4. Agregar la respuesta de la IA al historial
+        chatHistory[userId].push({ role: 'model', parts: [{ text: generatedResponse }] });
+
+        // Limitar el historial para evitar un token overflow
+        if (chatHistory[userId].length > 10) {
+            chatHistory[userId].splice(0, chatHistory[userId].length - 10);
+        }
+
+        // Lógica de conteo de uso (sin cambios)
         if (user) {
             user.aprendeNegociosCurrentMonthUsage += 1;
             await user.save();
@@ -126,7 +144,7 @@ router.post('/chat', checkUsage, async (req, res) => {
         });
         await newEntry.save();
 
-        // *** Obtener la recomendación si existe ***
+        // Obtener la recomendación de Sigma, si existe
         const recommendation = recommendations[userId] || null;
         if (recommendation) {
             delete recommendations[userId];

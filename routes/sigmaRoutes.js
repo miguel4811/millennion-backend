@@ -109,13 +109,18 @@ class SigmaCore {
                         modules.aprendeNegocios.addRecommendation(userId, recommendation);
                     }
                 } else if (sourceModule === 'aprendeNegocios') {
-                    if (prompt.includes('idea') || prompt.includes('innovar') || prompt.includes('nuevo')) {
+                    // *** MODIFICADO: Lógica de sinergia mejorada para Aprende de Negocios ***
+                    if (prompt.includes('idea') || prompt.includes('innovar') || prompt.includes('nuevo') || prompt.includes('crear')) {
                         const recommendation = "📈 ¡El conocimiento es el inicio de la creatividad! Usa lo que has aprendido para explorar un nuevo horizonte. Creanova es el lugar para dar forma a tu próxima gran idea.";
                         modules.creanova.addRecommendation(userId, recommendation);
                     }
                     if (prompt.includes('mercado') || prompt.includes('cliente') || prompt.includes('experiencia')) {
                         const recommendation = "🔍 La estrategia es una cosa, la percepción, otra. Para entender cómo tu propuesta impacta en la experiencia del usuario, cruza el umbral de la autoconciencia con Límen.";
                         modules.limen.addRecommendation(userId, recommendation);
+                    }
+                    if (prompt.includes('mvp') || prompt.includes('prototipo') || prompt.includes('lanzar')) {
+                        const recommendation = "🚀 La teoría es el mapa; la ejecución, el camino. Para dar forma a tu MVP y validarlo rápidamente, Creanova es la herramienta que te permitirá transformar la visión en realidad tangible.";
+                        modules.creanova.addRecommendation(userId, recommendation);
                     }
                 }
             }
