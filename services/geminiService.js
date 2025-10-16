@@ -1,53 +1,59 @@
 const { GoogleGenAI } = require('@google/genai');
 
-// Carga la clave API desde las variables de entorno de Render
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+// Leemos la clave de las variables de entorno de Render
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Inicializa el cliente. El SDK busca automáticamente GEMINI_API_KEY.
-// Usamos el constructor de GoogleGenAI directamente, que es la forma más reciente.
-const ai = new GoogleGenAI(GEMINI_API_KEY);
+// 🚨 LOG DE DEBUG CRÍTICO 🚨
+// Esto nos dirá si la variable de entorno está llegando.
+// NO MOSTRAR NUNCA TODA LA CLAVE en logs, solo si se detecta.
+if (GEMINI_API_KEY) {
+    console.log('[GEMINI SERVICE] API Key detectada (Longitud: %d). Iniciando cliente.', GEMINI_API_KEY.length);
+} else {
+    // Si esta línea aparece en los logs de Render, sabemos que la clave no se cargó.
+    console.error('[GEMINI SERVICE] ❌ ERROR CRÍTICO: GEMINI_API_KEY no está definida en process.env.');
+}
 
-/**
- * Función central para generar contenido con Gemini
- * @param {string} prompt El prompt del usuario.
- * @param {string} systemInstruction La instrucción de sistema o persona del modelo.
- * @param {Array<object>} history El historial de conversación (opcional).
- * @param {string} modelName El nombre del modelo a usar (ej: 'gemini-1.5-flash').
- * @returns {Promise<string>} La respuesta generada por la IA.
- */
-async function generateContent(prompt, systemInstruction, history = [], modelName = 'gemini-1.5-flash') {
+// Inicialización del cliente de Gemini
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+// Función para generar contenido con historial y persona (System Instruction)
+async function generateContent(userPrompt, systemInstruction, conversationHistory = [], model = 'gemini-1.5-flash') {
+    if (!GEMINI_API_KEY) {
+        // Esto captura si el cliente ya falló en la inicialización
+        throw new Error("La clave de API de Gemini no está configurada en el servidor.");
+    }
+    
+    // El historial completo para la llamada
+    const contents = [
+        ...conversationHistory,
+        { role: 'user', parts: [{ text: userPrompt }] }
+    ];
+
     try {
-        // Formatear el historial existente para que el SDK lo entienda
-        // El prompt del usuario se añade al final
-        const contents = [
-            ...history,
-            { role: "user", parts: [{ text: prompt }] }
-        ];
-
-        // Definimos la configuración con la instrucción del sistema
-        const config = {
-            systemInstruction: systemInstruction,
-            // Quitamos 'models/' aquí, el SDK lo añade o usa el alias correcto
-        };
-
         const response = await ai.models.generateContent({
-            model: modelName,
+            model: model,
             contents: contents,
-            config: config,
+            config: {
+                // La instrucción del sistema (persona) se define aquí
+                systemInstruction: systemInstruction,
+            }
         });
 
-        // Extraemos la respuesta de la manera segura del SDK
-        const generatedText = response.text || "Lo siento, la IA no pudo generar una respuesta.";
-        
-        return generatedText;
+        // 🚨 LOG DE DEBUG CRÍTICO 🚨
+        console.log('[GEMINI SERVICE] Llamada exitosa a modelo %s. Consumo de tokens: %d.', model, response.usageMetadata?.totalTokenCount || 'N/D');
 
-    } catch (error) {
-        console.error("Error en generateContent (SDK de Gemini):", error.message);
-        // Si el error es de modelo, forzamos un mensaje útil en los logs de Render
-        if (error.message.includes('model')) {
-             console.error("¡ERROR CRÍTICO! El nombre del modelo puede ser incorrecto. Nombre usado:", modelName);
+        const candidate = response.candidates?.[0];
+
+        if (candidate && candidate.content?.parts?.[0]?.text) {
+            return candidate.content.parts[0].text;
+        } else {
+            console.error('[GEMINI SERVICE] Respuesta vacía o incompleta de la IA:', JSON.stringify(response, null, 2));
+            throw new Error("La IA no pudo generar una respuesta válida.");
         }
-        throw new Error("Fallo en el servicio de IA. Verifica logs.");
+    } catch (error) {
+        // 🚨 LOG DE DEBUG CRÍTICO 🚨
+        console.error('[GEMINI SERVICE] ❌ FALLO DE API/CLIENTE:', error.message);
+        throw new Error("Fallo en la comunicación con el servicio de IA. La clave o el modelo podrían ser inválidos.");
     }
 }
 
