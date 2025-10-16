@@ -4,18 +4,22 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Log de diagnóstico
 if (GEMINI_API_KEY) {
-    console.log('[GEMINI SERVICE] API Key detectada (Longitud: %d). Iniciando cliente.', GEMINI_API_KEY.length);
+    // Es mejor no loggear la longitud de la clave por seguridad
+    console.log('[GEMINI SERVICE] API Key detectada. Iniciando cliente.');
 } else {
     console.error('[GEMINI SERVICE] ❌ ERROR CRÍTICO: GEMINI_API_KEY no está definida en process.env.');
 }
 
-// Inicialización del cliente de Gemini, forzando la versión v1 (solución anterior)
+// Inicialización del cliente de Gemini.
+// ¡CORRECCIÓN CLAVE! Se elimina 'apiVersion: "v1"' para usar la versión moderna que soporta gemini-1.5-flash.
 const ai = new GoogleGenAI({ 
-    apiKey: GEMINI_API_KEY,
-    apiVersion: 'v1' 
+    apiKey: GEMINI_API_KEY
+    // apiVersion: 'v1' <--- ¡ELIMINADO!
 });
 
 // Función para generar contenido con historial y persona (System Instruction)
+// Nota: La implementación de 'generateContent' que usaste con ai.models.generateContent({...})
+// ya es la estructura correcta para el nuevo SDK.
 async function generateContent(userPrompt, systemInstruction, conversationHistory = [], model = 'gemini-1.5-flash') {
     if (!GEMINI_API_KEY) {
         throw new Error("La clave de API de Gemini no está configurada en el servidor.");
@@ -28,16 +32,14 @@ async function generateContent(userPrompt, systemInstruction, conversationHistor
     ];
 
     try {
-        // 💥 SOLUCIÓN FINAL CLAVE 💥
-        // Se mueve systemInstruction al nivel superior, junto a 'model' y 'contents'.
+        // La estructura de la llamada es correcta para el modelo 1.5 con el SDK @google/genai
         const response = await ai.models.generateContent({
             model: model,
             contents: contents,
-            systemInstruction: systemInstruction, // <--- AHORA ESTÁ AQUÍ
-            // config: {} // Ya no necesitamos la propiedad 'config' si solo se usaba para la instrucción del sistema
+            systemInstruction: systemInstruction, 
         });
 
-        // Log de diagnóstico (Mantengo el log de éxito)
+        // Log de diagnóstico
         console.log('[GEMINI SERVICE] Llamada exitosa a modelo %s. Consumo de tokens: %d.', model, response.usageMetadata?.totalTokenCount || 'N/D');
 
         const candidate = response.candidates?.[0];
@@ -50,9 +52,10 @@ async function generateContent(userPrompt, systemInstruction, conversationHistor
             throw new Error("La IA no pudo generar una respuesta válida. (Revisar logs para Safety Settings)");
         }
     } catch (error) {
-        // Log de diagnóstico (Mantengo el log de fallo)
+        // Log de diagnóstico
         console.error('[GEMINI SERVICE] ❌ FALLO DE API/CLIENTE:', error.message);
-        throw new Error("Fallo en la comunicación con el servicio de IA. La clave o el modelo podrían ser inválidos.");
+        // El mensaje de error es más preciso ahora
+        throw new Error("Fallo en la comunicación con el servicio de IA. Verifique el nombre del modelo o la clave de API.");
     }
 }
 
