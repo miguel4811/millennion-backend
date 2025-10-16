@@ -5,16 +5,16 @@ const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 const AprendenNegociosEntry = require('../models/AprendeNegociosEntry');
 const { checkUsage } = require('../middleware/usageMiddleware');
-const Sigma = require('./sigmaRoutes.js'); // Asumiendo que es un módulo para notificaciones.
+const Sigma = require('./sigmaRoutes.js'); 
+// 🚨 CAMBIO CLAVE: Importamos el servicio centralizado
+const { generateContent } = require('../services/geminiService'); 
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-// 🚨 CORRECCIÓN CLAVE AQUÍ: Cambiamos 'v1beta' por 'v1' para asegurar que el modelo se encuentre
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"; 
+// 🚨 REMOVIDO: Ya no se necesitan las constantes de API (GEMINI_API_KEY, GEMINI_API_URL)
 
 // Constante para el límite ilimitado de usuarios anónimos
 const UNLIMITED_ANON_LIMIT = Number.MAX_SAFE_INTEGER; 
 
-// *** NUEVO: Objeto para almacenar el historial de conversación por usuario ***
+// *** Objeto para almacenar el historial de conversación por usuario ***
 const chatHistory = {};
 
 // Objeto para guardar las recomendaciones pendientes
@@ -25,12 +25,10 @@ router.addRecommendation = (userId, message) => {
 
 // Middleware para asegurar un usuario anónimo
 const ensureAnonymousUser = async (req, res) => {
-    // Si el usuario ya está autenticado o ya tiene un usuario anónimo (gracias a checkUsage), salir
     if (req.isUserAuthenticated || req.anonymousUser) {
         return;
     }
     
-    // Crear un nuevo usuario anónimo si no existe uno
     const newAnonymousId = uuidv4();
     const newAnonymousUser = new AnonymousUser({
         anonymousId: newAnonymousId,
@@ -38,17 +36,12 @@ const ensureAnonymousUser = async (req, res) => {
         aprendeNegociosMonthlyLimit: UNLIMITED_ANON_LIMIT, // <-- MODIFICACIÓN CLAVE: Ilimitado
     });
     
-    // Guardar el nuevo usuario anónimo. Nota: En la versión anterior se estaba creando, 
-    // pero el límite se asigna directamente al objeto, el cual se guarda en el controller.
-    // Aquí actualizamos el objeto AnonymousUser si usamos el esquema actualizado.
     await newAnonymousUser.save(); 
 
     req.anonymousUser = newAnonymousUser;
-    // Estos valores se usan para la respuesta del frontend.
     req.aprendeNegociosUsage = newAnonymousUser.aprendeNegociosCurrentMonthUsage;
     req.aprendeNegociosLimit = UNLIMITED_ANON_LIMIT; // Asignar el límite ilimitado
     
-    // Devolver el ID al cliente para que lo guarde
     res.setHeader('X-Set-Anonymous-ID', newAnonymousId);
 };
 
@@ -56,16 +49,13 @@ const ensureAnonymousUser = async (req, res) => {
 // @route   POST /api/aprende-negocios/chat
 // @access  Public (Autenticado o Anónimo)
 router.post('/chat', checkUsage, async (req, res) => {
-    // Si checkUsage no encontró un usuario (autenticado o anónimo), lo creamos aquí.
     await ensureAnonymousUser(req, res);
     
     const user = req.user;
     const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
-    // monthlyLimit ahora siempre será ilimitado (-1 para Auth, Max_Safe_Int para Anon)
     const monthlyLimit = req.aprendeNegociosLimit; 
     const { prompt } = req.body;
-    // Usamos el ID de MongoDB si es anónimo, si es que el esquema de AprendeNegociosEntry lo requiere.
     const userId = user ? user._id : anonymousUser ? anonymousUser.anonymousId : 'anonymous'; 
 
     if (!prompt) {
@@ -87,10 +77,11 @@ router.post('/chat', checkUsage, async (req, res) => {
     }
 
     // 2. Agregar el prompt del usuario al historial
+    // NOTA: Lo añadimos aquí, pero el servicio lo usará para la llamada y el paso 4 lo guardará.
     chatHistory[userId].push({ role: 'user', parts: [{ text: prompt }] });
 
-    // 3. Crear el prompt principal para la IA
-    const userPrompt = `Eres un mentor de negocios de élite y arquitecto de imperios. Tu rol no es solo dar información, sino moldear una mentalidad empresarial. Tu respuesta debe ser concisa, directa y orientada a la acción. Utiliza un tono motivador y enérgico, enfocado en estrategias prácticas y resultados.
+    // 3. Definir la System Instruction (Persona del modelo)
+    const systemInstruction = `Eres un mentor de negocios de élite y arquitecto de imperios. Tu rol no es solo dar información, sino moldear una mentalidad empresarial. Tu respuesta debe ser concisa, directa y orientada a la acción. Utiliza un tono motivador y enérgico, enfocado en estrategias prácticas y resultados.
     
     Considera los siguientes principios para tu respuesta:
     - **Piensa en sistemas, no en transacciones.**
@@ -102,41 +93,28 @@ router.post('/chat', checkUsage, async (req, res) => {
     
     La respuesta debe usar **Markdown** para un formato claro y legible. Utiliza negritas para resaltar conceptos clave. Asegúrate de que la respuesta sea relevante para la consulta del usuario, ofreciendo consejos de alto valor que reflejen esta mentalidad.`;
     
-    // El historial se convierte en la conversación
-    const conversation = [{ role: 'user', parts: [{ text: userPrompt }] }, ...chatHistory[userId]];
-    
+    // El historial se pasa directamente, excluimos el último (el actual) ya que se añade en el servicio
+    const conversation = chatHistory[userId].slice(0, -1); 
+    let generatedResponse = "La mentalidad es tu primer activo. ¿Qué estrategia quieres forjar?";
+
     try {
-        const payload = {
-            contents: conversation
-        };
-        
-        const llmResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!llmResponse.ok) {
-            const errorData = await llmResponse.json();
-            console.error('Error de Gemini API:', errorData);
-            throw new Error(errorData.error?.message || `Error ${llmResponse.status} al llamar a Gemini API.`);
-        }
-
-        const llmResult = await llmResponse.json();
-        let generatedResponse = "La mentalidad es tu primer activo. ¿Qué estrategia quieres forjar?";
-
-        if (llmResult.candidates && llmResult.candidates.length > 0 &&
-            llmResult.candidates[0].content && llmResult.candidates[0].content.parts &&
-            llmResult.candidates[0].content.parts.length > 0) {
-            generatedResponse = llmResult.candidates[0].content.parts[0].text;
-        }
+        // 🚨 USO DEL SERVICIO SDK: Llamada estable a Gemini
+        generatedResponse = await generateContent(
+            prompt, // El prompt actual del usuario
+            systemInstruction, // La persona del modelo
+            conversation, // El historial previo de la conversación
+            'gemini-1.5-flash' // Nombre del modelo
+        );
 
         // 4. Agregar la respuesta de la IA al historial
+        // Nota: Si la respuesta fue exitosa, el último elemento (que era el prompt del usuario) 
+        // se sustituye por el prompt del usuario y la respuesta del modelo.
+        // Como ya añadimos el prompt al inicio, solo añadimos la respuesta aquí.
         chatHistory[userId].push({ role: 'model', parts: [{ text: generatedResponse }] });
+
 
         // Limitar el historial para evitar un token overflow
         if (chatHistory[userId].length > 10) {
-            // El +1 del userPrompt ya se maneja en 'conversation' arriba. Aquí solo gestionamos el historial de chat.
             chatHistory[userId].splice(0, chatHistory[userId].length - 10);
         }
 
@@ -151,8 +129,6 @@ router.post('/chat', checkUsage, async (req, res) => {
 
         const newEntry = new AprendenNegociosEntry({
             userId: user ? user._id : null,
-            // NOTA: Revisa tu esquema, el campo anonymousId en AprendenNegociosEntry 
-            // debería ser el ID de MongoDB del AnonymousUser, no el anonymousId de la sesión.
             anonymousId: anonymousUser ? anonymousUser._id : null, 
             type: 'chat',
             query: prompt,
@@ -172,7 +148,6 @@ router.post('/chat', checkUsage, async (req, res) => {
         setTimeout(() => {
             res.json({
                 message: generatedResponse,
-                // Los campos de usage y limit ahora reflejan el estado ilimitado
                 usage: user ? user.aprendeNegociosCurrentMonthUsage : (anonymousUser ? anonymousUser.aprendeNegociosCurrentMonthUsage : 0),
                 limit: user ? user.aprendeNegociosMonthlyLimit : monthlyLimit,
                 isUserAuthenticated: isUserAuthenticated,
@@ -182,6 +157,7 @@ router.post('/chat', checkUsage, async (req, res) => {
 
     } catch (llmError) {
         console.error('Error al generar la respuesta con IA:', llmError);
+        // Devolvemos el 500 para indicar un error del servidor, que es lo que sucede al fallar la IA.
         res.status(500).json({ message: 'Algo salió mal al procesar tu solicitud. Por favor, intenta de nuevo más tarde.', error: llmError.message });
     }
 });
