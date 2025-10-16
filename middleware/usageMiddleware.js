@@ -2,10 +2,13 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AnonymousUser = require('../models/AnonymousUser');
 
+// Constante para simular un límite ilimitado
+const UNLIMITED = Number.MAX_SAFE_INTEGER;
+
 /**
- * @description Middleware para verificar la autenticación del usuario y
- *                 gestionar los límites de uso de los módulos.
- *                 El usuario puede ser autenticado o anónimo.
+ * @description Middleware para verificar la autenticación del usuario.
+ * **¡CAMBIO CLAVE!** Se ha configurado el acceso ILIMITADO a todos los módulos
+ * para TODOS los usuarios (autenticados y anónimos).
  */
 const checkUsage = async (req, res, next) => {
     let token;
@@ -29,58 +32,52 @@ const checkUsage = async (req, res, next) => {
         }
     }
 
+    // --- LÓGICA DE ASIGNACIÓN UNIVERSAL DE ACCESO ILIMITADO ---
+
     if (isUserAuthenticated && user) {
         // Opción 1: El usuario está autenticado, adjuntamos su información
         req.user = user;
         req.isUserAuthenticated = true;
-        
-        // Asignar los límites del usuario autenticado
-        req.creanovaUsage = user.creanovaCurrentMonthUsage;
-        req.creanovaLimit = user.creanovaMonthlyLimit;
-        req.limenUsage = user.limenCurrentMonthUsage;
-        
-        // Límite de 15 usos para usuarios autenticados con plan gratuito
-        req.limenLimit = user.limenMonthlyLimit || 15; 
-        
     } else {
-        // Opción 2: El usuario es anónimo o el token no es válido
+        // Opción 2: Usuario anónimo
         const anonymousId = req.headers['x-anonymous-id'];
         req.isUserAuthenticated = false;
         let anonymousUser = null;
 
         if (anonymousId) {
+            // Buscamos o creamos el usuario anónimo para mantener el ID de sesión
             anonymousUser = await AnonymousUser.findOne({ anonymousId });
             
             if (!anonymousUser) {
-                // Si no existe, lo creamos con el límite de 5 para Limen
+                // Si no existe, lo creamos (aunque ya no usaremos los límites, es útil para el tracking)
                 anonymousUser = await AnonymousUser.create({
                     anonymousId,
+                    // Establecemos usos y límites iniciales, aunque la lógica de abajo los ignorará
                     creanovaCurrentMonthUsage: 0,
-                    creanovaMonthlyLimit: process.env.CREANOVA_ANON_LIMIT || 3,
-                    
-                    // Límite de 5 usos para usuarios anónimos
+                    creanovaMonthlyLimit: UNLIMITED,
                     limenCurrentMonthUsage: 0,
-                    limenMonthlyLimit: process.env.LIMEN_ANON_LIMIT || 5, 
+                    limenMonthlyLimit: UNLIMITED, 
                 });
             }
         }
 
         req.anonymousUser = anonymousUser;
-        
-        if (anonymousUser) {
-            req.creanovaUsage = anonymousUser.creanovaCurrentMonthUsage;
-            req.creanovaLimit = anonymousUser.creanovaMonthlyLimit;
-            // Usar el límite de la base de datos si existe, si no, el por defecto
-            req.limenUsage = anonymousUser.limenCurrentMonthUsage;
-            req.limenLimit = anonymousUser.limenMonthlyLimit || 5; 
-        } else {
-            // Si no se encuentra ni se puede crear un usuario anónimo, usar valores por defecto
-            req.creanovaUsage = 0;
-            req.creanovaLimit = process.env.CREANOVA_ANON_LIMIT || 3;
-            req.limenUsage = 0;
-            req.limenLimit = process.env.LIMEN_ANON_LIMIT || 5;
-        }
     }
+
+    // ASIGNACIÓN DE LÍMITES ILIMITADOS PARA TODOS (Autenticados y Anónimos)
+    // Se asigna uso actual 0 y límite UNLIMITED a todos los módulos, 
+    // lo que efectivamente hace que el acceso sea gratuito para todos.
+    req.creanovaUsage = 0;
+    req.creanovaLimit = UNLIMITED;
+    
+    req.limenUsage = 0;
+    req.limenLimit = UNLIMITED; 
+    
+    // **NUEVA LÍNEA AÑADIDA:** Acceso ilimitado para Aprende de Negocios
+    req.aprendeNegociosUsage = 0;
+    req.aprendeNegociosLimit = UNLIMITED; 
+    
+    // -----------------------------------------------------
 
     next();
 };

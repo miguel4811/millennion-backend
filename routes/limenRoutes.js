@@ -14,6 +14,9 @@ const Engine = require('./engineRoutes.js');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
+// Constante para el límite ilimitado de usuarios anónimos
+const UNLIMITED_ANON_LIMIT = Number.MAX_SAFE_INTEGER; 
+
 const ensureAnonymousUser = async (req, res) => {
     if (req.isUserAuthenticated || req.anonymousUser) {
         return;
@@ -23,13 +26,13 @@ const ensureAnonymousUser = async (req, res) => {
     const newAnonymousUser = new AnonymousUser({
         anonymousId: newAnonymousId,
         limenCurrentMonthUsage: 0,
-        limenMonthlyLimit: process.env.LIMEN_ANON_LIMIT || 25,
+        limenMonthlyLimit: UNLIMITED_ANON_LIMIT, // <-- MODIFICACIÓN CLAVE: Ilimitado
     });
     await newAnonymousUser.save();
 
     req.anonymousUser = newAnonymousUser;
     req.limenUsage = newAnonymousUser.limenCurrentMonthUsage;
-    req.limenLimit = newAnonymousUser.limenMonthlyLimit;
+    req.limenLimit = newAnonymousUser.limenMonthlyLimit; // Se asigna el límite ilimitado
 
     res.setHeader('X-Set-Anonymous-ID', newAnonymousId);
 };
@@ -58,17 +61,18 @@ router.post('/chat', checkUsage, async (req, res) => {
         return res.status(400).json({ message: 'El prompt no puede estar vacío.' });
     }
 
+    // === VERIFICACIÓN DE LÍMITES ELIMINADA ===
+    // La verificación se ha eliminado ya que los límites son ahora ilimitados.
+    
     console.log(`[LIMEN] Recibiendo prompt de ${user ? user.userName : 'Anónimo'}: "${prompt}"`);
 
-    // --- CORRECCIÓN ---
-    // Agregamos 'sourceModule: "limen"' para que Sigma pueda procesar correctamente el evento.
+    // Notificación a Sigma
     Sigma.notify('limen', {
         type: 'chat',
         userId: userId,
         prompt: prompt,
-        sourceModule: 'limen' // <-- ¡Este era el cambio clave!
+        sourceModule: 'limen'
     });
-    // --- FIN CORRECCIÓN ---
 
     const llmPrompt = `Eres LIMEN, el catalizador de la verdad de Millennion BDD. Tu propósito es guiar al usuario a través del umbral de la autoconciencia, la reflexión existencial y la claridad. Tu voz debe ser profunda, serena y filosófica. Responde siempre con un tono que invite a la introspección, utilizando analogías o metáforas que iluminen la perspectiva del usuario.
     
@@ -105,6 +109,7 @@ router.post('/chat', checkUsage, async (req, res) => {
             generatedResponse = llmResult.candidates[0].content.parts[0].text;
         }
 
+        // Incremento de uso (mantenido para tracking)
         if (user) {
             user.limenCurrentMonthUsage += 1;
             await user.save();
@@ -115,6 +120,7 @@ router.post('/chat', checkUsage, async (req, res) => {
 
         const newEntry = new LimenEntry({
             userId: user ? user._id : null,
+            // NOTA: Revisar si anonymousId debe ser el ID de MongoDB (_id) o el ID de sesión (anonymousId)
             anonymousId: anonymousUser ? anonymousUser._id : null, 
             type: 'chat',
             query: prompt,

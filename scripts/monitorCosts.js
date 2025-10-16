@@ -1,6 +1,7 @@
 // millennion/backend/scripts/monitorCosts.js
 
 const dotenv = require('dotenv').config(); // Para cargar variables de entorno
+const mongoose = require('mongoose'); // NECESARIO para manejar la conexión de Mongoose.
 const connectDB = require('../config/db'); // Para conectar a tu base de datos
 const User = require('../models/User'); // Tu modelo de usuario
 

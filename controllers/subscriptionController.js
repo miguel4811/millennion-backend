@@ -3,34 +3,37 @@ const User = require('../models/User');
 const axios = require('axios');
 
 // Función auxiliar para actualizar los límites del usuario según el plan
+// **MODIFICACIÓN CLAVE: TODOS LOS LÍMITES SE ESTABLECEN A -1 (ILIMITADO)**
 const updatePlanLimits = (user, planName) => {
+    // Convención: -1 significa ilimitado
+    const UNLIMITED_LIMIT = -1; 
+    
+    // Todos los planes ahora ofrecen acceso ilimitado
     switch (planName) {
         case 'Free':
-            user.creanovaMonthlyLimit = 10;
-            user.limenMonthlyLimit = 15;
-            break;
         case 'Essential':
-            user.creanovaMonthlyLimit = 50;
-            user.limenMonthlyLimit = 80;
-            break;
         case 'Forjador':
-            user.creanovaMonthlyLimit = 200;
-            user.limenMonthlyLimit = 320;
-            break;
         case 'Visionario':
-            user.creanovaMonthlyLimit = -1; // -1 significa ilimitado
-            user.limenMonthlyLimit = -1;
+            user.creanovaMonthlyLimit = UNLIMITED_LIMIT; 
+            user.limenMonthlyLimit = UNLIMITED_LIMIT;
+            user.aprendeNegociosMonthlyLimit = UNLIMITED_LIMIT; // <-- AÑADIDO: Módulo Aprende de Negocios
             break;
         default:
-            user.creanovaMonthlyLimit = 10;
-            user.limenMonthlyLimit = 15;
+            // Por defecto, si el plan es desconocido, también le damos ilimitado
+            user.creanovaMonthlyLimit = UNLIMITED_LIMIT;
+            user.limenMonthlyLimit = UNLIMITED_LIMIT;
+            user.aprendeNegociosMonthlyLimit = UNLIMITED_LIMIT; // <-- AÑADIDO
             planName = 'Free';
     }
+    
+    // Asignación de plan y reseteo de usos, aunque los límites sean ilimitados
     user.plan = planName;
     user.creanovaCurrentMonthUsage = 0;
     user.limenCurrentMonthUsage = 0;
+    user.aprendeNegociosCurrentMonthUsage = 0; // <-- AÑADIDO: Reseteo de uso
     user.creanovaLastReset = new Date();
     user.limenLastReset = new Date();
+    user.aprendeNegociosLastReset = new Date(); // <-- AÑADIDO: Reseteo de fecha
 };
 
 const changeUserPlan = async (req, res) => {
@@ -38,8 +41,11 @@ const changeUserPlan = async (req, res) => {
     try {
         const user = await User.findById(userId);
         if (!user) { return res.status(404).json({ message: 'Usuario no encontrado.' }); }
-        const validPlans = ['Free', 'Essential', 'Forjador', 'Visionario'];
+        
+        // Mantener planes para la lógica de PayPal/Webhooks, aunque los límites sean iguales
+        const validPlans = ['Free', 'Essential', 'Forjador', 'Visionario']; 
         if (!validPlans.includes(newPlan)) { return res.status(400).json({ message: 'Plan no válido.' }); }
+        
         updatePlanLimits(user, newPlan);
         await user.save();
         res.status(200).json({ message: `Plan de usuario actualizado a ${newPlan}`, user: user });
@@ -70,10 +76,8 @@ const generateAccessToken = async () => {
 };
 
 // ** IDs reales de tus planes de suscripción de PayPal en el entorno Live **
-// --- ¡ATENCIÓN! ---
-// El 'ID_DEL_PLAN_ESSENTIAL' ha sido actualizado con el ID que proporcionaste.
 const planToPayPalPlanId = {
-    Essential: 'P-3VR86834ML9882119NCDHUUY', // <--- ID corregido
+    Essential: 'P-3VR86834ML9882119NCDHUUY', 
     Forjador: 'P-5RL977229K126853LNCDHXPQ',
     Visionario: 'P-01W50725YJ103935FNCDHYGQ',
 };
@@ -260,6 +264,8 @@ const handlePayPalWebhook = async (req, res) => {
                         }
                     }
 
+                    // Se sigue llamando a updatePlanLimits para actualizar los campos de plan/uso/reset, 
+                    // aunque los límites sean ilimitados.
                     if (planNameFromPayPal) {
                         updatePlanLimits(user, planNameFromPayPal);
                         await user.save();
@@ -284,12 +290,13 @@ const handlePayPalWebhook = async (req, res) => {
                 const user = await User.findOne({ paypalSubscriptionId: changedSubscription.id });
                 if (user) {
                     user.paypalSubscriptionStatus = changedSubscription.status;
-                    updatePlanLimits(user, 'Free');
+                    // Mantenemos el plan en 'Free' que también es ilimitado
+                    updatePlanLimits(user, 'Free'); 
                     if (webhookEvent.event_type === 'BILLING.SUBSCRIPTION.CANCELLED' || webhookEvent.event_type === 'BILLING.SUBSCRIPTION.EXPIRED') {
                         user.paypalSubscriptionId = undefined;
                     }
                     await user.save();
-                    console.log(`Usuario ${user.email} degradado a plan Free por estado de suscripción: ${changedSubscription.status}`);
+                    console.log(`Usuario ${user.email} degradado a plan Free (ilimitado) por estado de suscripción: ${changedSubscription.status}`);
                 }
             } catch (err) {
                 console.error(`Error al manejar ${webhookEvent.event_type}:`, err.message);
@@ -304,7 +311,6 @@ const handlePayPalWebhook = async (req, res) => {
                 // Se busca el usuario por el ID de la suscripción de PayPal.
                 const user = await User.findOne({ paypalSubscriptionId: completedPayment.billing_agreement_id });
                 if (user) {
-                    // Aquí podrías agregar lógica adicional si fuera necesario, como registrar el pago en otra colección.
                     // Para este caso, el plan del usuario ya está activo, así que no se necesita cambiar nada más.
                     console.log(`Pago exitoso para el usuario ${user.email} para la suscripción ${completedPayment.billing_agreement_id}.`);
                 } else {

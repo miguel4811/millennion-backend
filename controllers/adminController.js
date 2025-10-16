@@ -10,24 +10,27 @@ const resetMonthlyUsage = async (req, res) => {
     try {
         // En un entorno real, aquí podrías añadir una verificación de token de API
         // o un secreto para asegurar que solo Render Cron Job pueda llamar a esta ruta.
-        // Por ahora, la protección será a nivel de la ruta en adminRoutes.js si lo deseas.
-
+        
         const users = await User.find({}); // Encuentra todos los usuarios
 
         let updatedCount = 0;
         for (const user of users) {
-            // Solo resetear si el uso actual es mayor que 0 o si la fecha de reset es del mes anterior
-            // La lógica de updatePlanLimits ya resetea los contadores a 0.
-            // Aquí, queremos resetear el uso actual y la fecha de reset para el mes en curso.
             const now = new Date();
-            const lastReset = user.creanovaLastReset || new Date(0); // Usa 0 para usuarios sin fecha
+            // Usamos la fecha de Creanova o una fecha de inicio (0) para la verificación de mes
+            const lastReset = user.creanovaLastReset || new Date(0); 
             
             // Comprueba si el último reseteo fue en un mes diferente al actual
             if (lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear()) {
                 user.creanovaCurrentMonthUsage = 0;
                 user.limenCurrentMonthUsage = 0;
+                // **CAMBIO AÑADIDO:** Reseteo del módulo Aprende de Negocios
+                user.aprendeNegociosCurrentMonthUsage = 0; 
+
                 user.creanovaLastReset = now; // Actualiza la fecha de último reseteo
-                user.limenLastReset = now;   // Actualiza la fecha de último reseteo
+                user.limenLastReset = now;    // Actualiza la fecha de último reseteo
+                // **CAMBIO AÑADIDO:** Actualiza la fecha de reseteo para Aprende de Negocios
+                user.aprendeNegociosLastReset = now; 
+                
                 await user.save();
                 updatedCount++;
             }

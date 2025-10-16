@@ -37,8 +37,9 @@ router.post('/register', async (req, res) => {
             // level, coherentDecisions, structuralPatterns, ineffectiveCycles serán inicializados por defecto
         });
 
-        // === ASIGNAR PLAN GRATUITO Y LÍMITES POR DEFECTO ===
-        updatePlanLimits(newUser, 'Free'); // Llama a la función para configurar el plan y sus límites
+        // === ASIGNAR PLAN GRATUITO E ILIMITADO ===
+        // Asume que updatePlanLimits configura los límites a ILIMITADO (-1) para 'Free'.
+        updatePlanLimits(newUser, 'Free'); 
         // === FIN ASIGNACIÓN ===
 
         // 4. Guardar el usuario en la base de datos
@@ -54,9 +55,7 @@ router.post('/register', async (req, res) => {
                 coherentDecisions: newUser.coherentDecisions,
                 structuralPatterns: newUser.structuralPatterns,
                 ineffectiveCycles: newUser.ineffectiveCycles,
-                // === AÑADIR EL PLAN AL TOKEN JWT ===
                 plan: newUser.plan,
-                // === FIN AÑADIR PLAN ===
             },
             JWT_SECRET,
             { expiresIn: '1h' } // El token expira en 1 hora
@@ -73,9 +72,7 @@ router.post('/register', async (req, res) => {
                 coherentDecisions: newUser.coherentDecisions,
                 structuralPatterns: newUser.structuralPatterns,
                 ineffectiveCycles: newUser.ineffectiveCycles,
-                // === AÑADIR EL PLAN A LA RESPUESTA DEL USUARIO ===
                 plan: newUser.plan,
-                // === FIN AÑADIR PLAN ===
             },
         });
 
@@ -102,7 +99,8 @@ router.post('/login', async (req, res) => {
         }
 
         // 3. Comparar contraseñas
-        const isMatch = await user.matchPassword(password);
+        // Asume que el modelo User tiene un método `matchPassword`
+        const isMatch = await user.matchPassword(password); 
         if (!isMatch) {
             return res.status(404).json({ message: 'Credenciales inválidas.' });
         }
@@ -117,9 +115,7 @@ router.post('/login', async (req, res) => {
                 coherentDecisions: user.coherentDecisions,
                 structuralPatterns: user.structuralPatterns,
                 ineffectiveCycles: user.ineffectiveCycles,
-                // === AÑADIR EL PLAN AL TOKEN JWT (PARA EL LOGIN) ===
                 plan: user.plan,
-                // === FIN AÑADIR PLAN ===
             },
             JWT_SECRET,
             { expiresIn: '1h' }
@@ -136,9 +132,7 @@ router.post('/login', async (req, res) => {
                 coherentDecisions: user.coherentDecisions,
                 structuralPatterns: user.structuralPatterns,
                 ineffectiveCycles: user.ineffectiveCycles,
-                // === AÑADIR EL PLAN A LA RESPUESTA DEL USUARIO (PARA EL LOGIN) ===
                 plan: user.plan,
-                // === FIN AÑADIR PLAN ===
             },
         });
 

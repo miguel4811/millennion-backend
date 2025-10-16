@@ -17,6 +17,11 @@ const AnonymousUserSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // **CAMBIO AÑADIDO:** Campo para el uso de Aprende de Negocios
+    aprendeNegociosCurrentMonthUsage: {
+        type: Number,
+        default: 0
+    },
     lastReset: { // Para saber cuándo fue el último reseteo de este usuario anónimo
         type: Date,
         default: Date.now

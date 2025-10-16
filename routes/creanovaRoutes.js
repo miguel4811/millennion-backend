@@ -28,8 +28,9 @@ router.post('/chat', checkUsage, async (req, res) => {
     const anonymousUser = req.anonymousUser;
     const isUserAuthenticated = req.isUserAuthenticated;
 
+    // Aunque los límites son ilimitados, estas variables aún se recuperan del middleware
     const currentUsage = req.creanovaUsage;
-    const monthlyLimit = req.creanovaLimit;
+    const monthlyLimit = req.creanovaLimit; 
 
     const { prompt: userPrompt, conversationHistory = [] } = req.body;
 
@@ -37,19 +38,13 @@ router.post('/chat', checkUsage, async (req, res) => {
         return res.status(400).json({ message: 'El prompt del usuario no puede estar vacío.' });
     }
 
-    // === VERIFICACIÓN DE LÍMITES ===
-    if (monthlyLimit !== -1 && currentUsage >= monthlyLimit) {
-        return res.status(403).json({
-            message: isUserAuthenticated
-                ? `Has alcanzado tu límite mensual de Creanova (${monthlyLimit} usos). Por favor, actualiza tu plan.`
-                : `Has alcanzado tu límite de usos gratuitos de Creanova (${monthlyLimit} usos). Por favor, inicia sesión o regístrate para continuar.`
-        });
-    }
-
+    // === VERIFICACIÓN DE LÍMITES ELIMINADA ===
+    // La verificación se ha eliminado ya que los límites son ahora ilimitados (-1).
+    
     try {
         console.log(`[CREANOVA Backend] Generando idea para ${user ? user.userName : 'Anónimo'} con prompt: "${userPrompt}"`);
 
-        // *** Nuevo: Notificar a Sigma sobre el evento de chat ***
+        // *** Notificar a Sigma sobre el evento de chat ***
         const userId = user ? user._id : anonymousUser ? anonymousUser.anonymousId : 'anonymous';
         Sigma.notify('creanova', {
             type: 'chat',
@@ -96,7 +91,7 @@ router.post('/chat', checkUsage, async (req, res) => {
             generatedIdea = llmResult.candidates[0].content.parts[0].text;
         }
 
-        // === INCREMENTO DE USO Y GUARDADO ===
+        // === INCREMENTO DE USO Y GUARDADO (Mantenido para tracking) ===
         if (user) {
             user.creanovaCurrentMonthUsage += 1;
             await user.save();
@@ -120,7 +115,7 @@ router.post('/chat', checkUsage, async (req, res) => {
             console.warn("CreanovaEntry model not found. Skipping saving idea to DB.");
         }
 
-        // *** Nuevo: Obtener la recomendación si existe ***
+        // *** Obtener la recomendación si existe ***
         const recommendation = recommendations[userId] || null;
         if (recommendation) {
             delete recommendations[userId];
@@ -143,6 +138,7 @@ router.post('/chat', checkUsage, async (req, res) => {
 // Endpoint para Obtener ideas de proyecto del usuario (Solo para autenticados)
 // GET /api/creanova/user-ideas
 router.get('/user-ideas', checkUsage, async (req, res) => {
+    // La verificación de autenticación se mantiene, ya que solo los usuarios logueados pueden ver su historial.
     if (!req.isUserAuthenticated) {
         return res.status(403).json({ message: 'Debes iniciar sesión para ver tus ideas de Creanova.' });
     }

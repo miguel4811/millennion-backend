@@ -6,6 +6,9 @@ const jwt = require('jsonwebtoken');
 
 const { updatePlanLimits } = require('./subscriptionController'); 
 
+// Constante para definir el límite ilimitado para usuarios autenticados
+const UNLIMITED_AUTH_LIMIT = -1;
+
 // @desc    Registrar un nuevo usuario
 // @route   POST /api/users/register
 // @access  Public
@@ -31,12 +34,13 @@ const registerUser = async (req, res) => {
             password: hashedPassword,
         });
 
-        // Configurar los límites del plan "Free"
+        // Configurar los límites a ILIMITADOS (-1) para el plan "Free"
         user.plan = 'Free';
-        user.creanovaMonthlyLimit = 10;
-        user.limenMonthlyLimit = 25; // **[CAMBIO AQUÍ]** de 15 a 25
-        // AHORA INICIALIZAMOS LOS LÍMITES PARA EL NUEVO MÓDULO "APRENDE DE NEGOCIOS"
-        user.aprendeNegociosMonthlyLimit = 30;
+        user.creanovaMonthlyLimit = UNLIMITED_AUTH_LIMIT; // <-- ILIMITADO
+        user.limenMonthlyLimit = UNLIMITED_AUTH_LIMIT;    // <-- ILIMITADO
+        
+        // Módulo "APRENDE DE NEGOCIOS" configurado como ILIMITADO
+        user.aprendeNegociosMonthlyLimit = UNLIMITED_AUTH_LIMIT; // <-- ILIMITADO
         user.aprendeNegociosCurrentMonthUsage = 0;
         
         // Propiedades adicionales
@@ -62,7 +66,7 @@ const registerUser = async (req, res) => {
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
                 limenMonthlyLimit: user.limenMonthlyLimit,
-                // AHORA DEVOLVEMOS LOS LÍMITES EN LA RESPUESTA
+                // Devolvemos los límites ilimitados en la respuesta
                 aprendeNegociosMonthlyLimit: user.aprendeNegociosMonthlyLimit,
                 aprendeNegociosCurrentMonthUsage: user.aprendeNegociosCurrentMonthUsage,
                 level: user.level,
@@ -94,7 +98,8 @@ const loginUser = async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ email }).select('+password');
+        // Asegúrate de que los campos con select: false se carguen (ej: password)
+        const user = await User.findOne({ email }).select('+password'); 
         if (!user) {
             return res.status(400).json({ message: 'Credenciales inválidas (email no encontrado).' });
         }
@@ -119,9 +124,9 @@ const loginUser = async (req, res) => {
                 plan: user.plan,
                 creanovaMonthlyLimit: user.creanovaMonthlyLimit,
                 limenMonthlyLimit: user.limenMonthlyLimit,
-                // AHORA DEVOLVEMOS LOS LÍMITES EN LA RESPUESTA
-                aprendeNegociosMonthlyLimit: user.aprendeNegociosMonthlyLimit || 30, // Usa el valor guardado o el valor por defecto
-                aprendeNegociosCurrentMonthUsage: user.aprendeNegociosCurrentMonthUsage || 0, // Usa el valor guardado o el valor por defecto
+                // Devolvemos los límites
+                aprendeNegociosMonthlyLimit: user.aprendeNegociosMonthlyLimit || UNLIMITED_AUTH_LIMIT,
+                aprendeNegociosCurrentMonthUsage: user.aprendeNegociosCurrentMonthUsage || 0,
                 paypalSubscriptionId: user.paypalSubscriptionId,
                 paypalSubscriptionStatus: user.paypalSubscriptionStatus,
                 level: user.level,
