@@ -1,4 +1,3 @@
-// aprendeNegociosRoutes.js
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
@@ -9,7 +8,8 @@ const { checkUsage } = require('../middleware/usageMiddleware');
 const Sigma = require('./sigmaRoutes.js'); // Asumiendo que es un módulo para notificaciones.
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+// 🚨 CORRECCIÓN CLAVE AQUÍ: Cambiamos 'v1beta' por 'v1' para asegurar que el modelo se encuentre
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"; 
 
 // Constante para el límite ilimitado de usuarios anónimos
 const UNLIMITED_ANON_LIMIT = Number.MAX_SAFE_INTEGER; 
@@ -136,6 +136,7 @@ router.post('/chat', checkUsage, async (req, res) => {
 
         // Limitar el historial para evitar un token overflow
         if (chatHistory[userId].length > 10) {
+            // El +1 del userPrompt ya se maneja en 'conversation' arriba. Aquí solo gestionamos el historial de chat.
             chatHistory[userId].splice(0, chatHistory[userId].length - 10);
         }
 

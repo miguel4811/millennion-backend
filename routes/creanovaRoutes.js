@@ -1,4 +1,3 @@
-// creanovaRoutes.js
 const express = require('express');
 const router = express.Router();
 const { checkUsage } = require('../middleware/usageMiddleware');
@@ -11,7 +10,10 @@ const Sigma = require('./sigmaRoutes.js');
 const Engine = require('./engineRoutes.js');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+// 🚨 CORRECCIÓN CLAVE AQUÍ: Cambiamos 'v1beta' por 'v1' para asegurar la URL correcta.
+// También ajustamos a 'gemini-1.5-flash' para mantener la consistencia con tu primer archivo,
+// ya que 'gemini-2.0-flash' ya no es el nombre oficial.
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"; 
 
 // *** Nuevo: Objeto para guardar las recomendaciones pendientes para cada usuario ***
 const recommendations = {};
