@@ -11,16 +11,18 @@ if (GEMINI_API_KEY) {
 }
 
 // Inicialización del cliente de Gemini.
-// ¡CORRECCIÓN CLAVE! Se elimina 'apiVersion: "v1"' para usar la versión moderna que soporta gemini-1.5-flash.
+// La configuración es correcta para el SDK moderno.
 const ai = new GoogleGenAI({ 
     apiKey: GEMINI_API_KEY
-    // apiVersion: 'v1' <--- ¡ELIMINADO!
+    // apiVersion: 'v1' <--- ¡ELIMINADO CORRECTAMENTE!
 });
 
-// Función para generar contenido con historial y persona (System Instruction)
-// Nota: La implementación de 'generateContent' que usaste con ai.models.generateContent({...})
-// ya es la estructura correcta para el nuevo SDK.
-async function generateContent(userPrompt, systemInstruction, conversationHistory = [], model = 'gemini-1.5-flash') {
+/**
+ * Función para generar contenido.
+ * Se cambió el modelo predeterminado a 'gemini-pro' para asegurar la compatibilidad 
+ * con la API v1beta que está utilizando el entorno de Render.
+ */
+async function generateContent(userPrompt, systemInstruction, conversationHistory = [], model = 'gemini-pro') {
     if (!GEMINI_API_KEY) {
         throw new Error("La clave de API de Gemini no está configurada en el servidor.");
     }
@@ -32,7 +34,6 @@ async function generateContent(userPrompt, systemInstruction, conversationHistor
     ];
 
     try {
-        // La estructura de la llamada es correcta para el modelo 1.5 con el SDK @google/genai
         const response = await ai.models.generateContent({
             model: model,
             contents: contents,
