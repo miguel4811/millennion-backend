@@ -90,7 +90,7 @@ router.post('/chat', checkUsage, async (req, res) => {
             prompt, // El prompt actual del usuario
             systemInstruction, // La persona del modelo
             [], // Sin historial
-            'gemini-1.5-flash' // Nombre del modelo
+            'gemini-pro' // <-- ¡CORRECCIÓN CLAVE! Se usa 'gemini-pro' para compatibilidad con la API v1beta.
         );
 
         // Incremento de uso (mantenido para tracking)

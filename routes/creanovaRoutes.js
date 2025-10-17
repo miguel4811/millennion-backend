@@ -69,7 +69,7 @@ router.post('/chat', checkUsage, async (req, res) => {
             userPrompt, 
             systemInstruction, 
             formattedHistory, // Historial previo
-            'gemini-1.5-flash' 
+            'gemini-pro' // <-- ¡CORRECCIÓN CLAVE! Se usa 'gemini-pro' para compatibilidad con la API v1beta.
         );
 
         // === INCREMENTO DE USO Y GUARDADO (Mantenido para tracking) ===

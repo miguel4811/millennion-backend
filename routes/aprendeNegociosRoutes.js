@@ -77,7 +77,6 @@ router.post('/chat', checkUsage, async (req, res) => {
     }
 
     // 2. Agregar el prompt del usuario al historial
-    // NOTA: Lo añadimos aquí, pero el servicio lo usará para la llamada y el paso 4 lo guardará.
     chatHistory[userId].push({ role: 'user', parts: [{ text: prompt }] });
 
     // 3. Definir la System Instruction (Persona del modelo)
@@ -103,13 +102,10 @@ router.post('/chat', checkUsage, async (req, res) => {
             prompt, // El prompt actual del usuario
             systemInstruction, // La persona del modelo
             conversation, // El historial previo de la conversación
-            'gemini-1.5-flash' // Nombre del modelo
+            'gemini-pro' // <-- ¡CORRECCIÓN CLAVE! Se usa 'gemini-pro' para compatibilidad con la API v1beta.
         );
 
         // 4. Agregar la respuesta de la IA al historial
-        // Nota: Si la respuesta fue exitosa, el último elemento (que era el prompt del usuario) 
-        // se sustituye por el prompt del usuario y la respuesta del modelo.
-        // Como ya añadimos el prompt al inicio, solo añadimos la respuesta aquí.
         chatHistory[userId].push({ role: 'model', parts: [{ text: generatedResponse }] });
 
 

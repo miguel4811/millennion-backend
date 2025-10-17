@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Ya importado, ¡excelente!
+const cors = require('cors');
 
 // Importaciones de rutas existentes
 const userRoutes = require('./routes/Users');
@@ -20,11 +20,11 @@ const { checkUsage } = require('./middleware/usageMiddleware');
 const app = express();
 
 // --- CONFIGURACIÓN DE CORS CORREGIDA Y OPTIMIZADA ---
-// Permitir las variantes con y sin 'www', además del dominio de Render para pruebas (si fuera necesario).
+// Lista explícita de orígenes permitidos, crucial para resolver el error CORS.
 const allowedOrigins = [
     'https://millennionbdd.com', 
     'https://www.millennionbdd.com',
-    'https://millennion-backend.onrender.com' // Si necesitas que el backend acceda a sí mismo o para pruebas.
+    'https://millennion-backend.onrender.com' // Incluir el dominio de Render para auto-pruebas.
 ];
 
 const corsOptions = {
@@ -32,13 +32,10 @@ const corsOptions = {
     // El status 204 es el estándar para respuestas pre-vuelo exitosas (preflight)
     optionsSuccessStatus: 204, 
     exposedHeaders: ['X-Set-Anonymous-ID']
-    // No usamos 'credentials: true' a menos que realmente se usen cookies/sesiones
 };
 
 app.use(cors(corsOptions));
 app.use(express.json()); // Middleware para parsear JSON en el body
-
-// -------------------------------------------------------------------------
 
 // Conexión a MongoDB
 const mongoUri = process.env.MONGO_URI;
